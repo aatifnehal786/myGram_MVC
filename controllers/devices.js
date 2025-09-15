@@ -2,31 +2,29 @@ import jwt from "jsonwebtoken";
 import User from "../models/userModel.js";
  // centralize OTP storage
 
+import OTP from "../models/otpModels.js";
 
- const otpStorage = {}
-
-// ✅ Verify Device OTP
 export const verifyDeviceOtp = async (req, res) => {
   const { email, otp, deviceId } = req.body;
-  console.log("Verify request:", deviceId, email, otp);
 
   if (!email || !otp || !deviceId) {
     return res.status(400).json({ message: "Missing required fields" });
   }
 
-  const storedOtp = otpStorage[email];
-  if (!storedOtp || storedOtp.otp !== otp || storedOtp.expiresAt < Date.now()) {
-    return res.status(400).json({ message: "Invalid or expired OTP" });
-  }
-
   try {
-    const user = await User.findOne({ email });
+    // ✅ Find OTP in DB
+    const otpDoc = await OTP.findOne({ email: email.toLowerCase() });
+    if (!otpDoc || otpDoc.otp !== String(otp) || otpDoc.expiresAt < Date.now()) {
+      return res.status(400).json({ message: "Invalid or expired OTP" });
+    }
+
+    // ✅ OTP is valid → authorize device
+    const user = await User.findOne({ email: email.toLowerCase() });
     if (!user) return res.status(404).json({ message: "User not found" });
 
     const ua = req.useragent;
 
-    // ✅ Check if device exists
-    const existingDevice = user.devices.find((d) => d.deviceId === deviceId);
+    const existingDevice = user.devices.find(d => d.deviceId === deviceId);
 
     if (existingDevice) {
       existingDevice.ip = req.ip;
@@ -45,7 +43,8 @@ export const verifyDeviceOtp = async (req, res) => {
 
     await user.save();
 
-    delete otpStorage[email]; // clear OTP
+    // ✅ Delete OTP after use
+    await OTP.deleteOne({ _id: otpDoc._id });
 
     const token = jwt.sign(
       { email: user.email, id: user._id },
@@ -64,6 +63,8 @@ export const verifyDeviceOtp = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
+
 
 // ✅ Get all devices
 export const getDevices = async (req, res) => {
