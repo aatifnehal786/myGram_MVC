@@ -1,11 +1,16 @@
-const { Server } = require("socket.io");
-const User = require("../models/userModel");
-const Message = require("../models/messageModel");
+import { Server } from "socket.io";
+import User from '../models/userModel.js'
+import Message from "../models/messageModel.js";
 
 function socketHandler(server) {
   const io = new Server(server, {
-    cors: { origin: "*", methods: ["GET", "POST", "PUT", "DELETE"], credentials: true },
-  });
+  cors: {
+    origin: "http://localhost:5173",
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    credentials: true,
+  },
+});
+
 
   global.onlineUsers = new Map();
 
@@ -56,4 +61,4 @@ function socketHandler(server) {
   });
 }
 
-module.exports = socketHandler;
+export default socketHandler

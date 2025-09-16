@@ -83,12 +83,16 @@ const getChat = async (req, res) => {
     if (!sender || !receiver)
       return res.status(404).json({ error: "User not found" });
 
-    const messages = await Message.find({
-      $or: [
-        { sender: currentUserId, receiver: targetUserId },
-        { sender: targetUserId, receiver: currentUserId },
-      ],
-    }).sort({ createdAt: 1 });
+   const messages = await Message.find({
+  $or: [
+    { sender: currentUserId, receiver: targetUserId },
+    { sender: targetUserId, receiver: currentUserId },
+  ],
+})
+  .sort({ createdAt: 1 })
+  .populate("sender", "_id name username profilePic")
+  .populate("receiver", "_id name username profilePic");
+
 
     res.status(200).json(messages);
   } catch (err) {
@@ -98,9 +102,9 @@ const getChat = async (req, res) => {
 };
 
 // Search users
-const searchUsers = async (req, res, onlineUsers) => {
+const searchUsers = async (req, res) => {
   const query = req.query.q;
-  const onlineUserIds = Array.from(onlineUsers.keys());
+  const onlineUserIds = Array.from(global.onlineUsers?.keys() || []);
 
   try {
     const users = await User.find({
@@ -125,6 +129,7 @@ const searchUsers = async (req, res, onlineUsers) => {
     res.status(500).json({ error: "Server error" });
   }
 };
+
 
 // Get chat list
 const getChatList = async (req, res) => {

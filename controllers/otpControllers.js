@@ -4,7 +4,7 @@ import User from "../models/userModel.js";
 import client from "../config/client.js"; // assume you export Twilio client
 import { sendOtpEmail } from "../utils/sendMail.js";
 
-
+const otpStorage = {}
 
 // 📱 Send Mobile OTP (Twilio)
 export const sendMobileOtp = async (req, res) => {

@@ -3,6 +3,8 @@ import {CloudinaryStorage} from 'multer-storage-cloudinary'
 import cloudinary from '../config/cloudinary.js'
 import path from "path";
 
+
+
 // Profile Pic Storage
 const profilePicStorage = new CloudinaryStorage({
   cloudinary:cloudinary,
@@ -16,23 +18,39 @@ const uploadProfilePic = multer({ storage: profilePicStorage });
 
 // Post & Music Storage
 
-const storage = new CloudinaryStorage({
-  cloudinary: cloudinary,   // ⬅ required
-  params: async (req, file) => {
-    let folder = "uploads";
 
-    if (file.fieldname === "profilePic") {
-      folder = "profile_pics";
-    } else if (file.fieldname === "chatFile") {
-      folder = "chat_files";
-    }
+
+
+
+
+// Make sure cloudinary.config({...}) is done before this
+// Example:
+// cloudinary.config({
+//   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+//   api_key: process.env.CLOUDINARY_API_KEY,
+//   api_secret: process.env.CLOUDINARY_API_SECRET,
+// });
+
+const storage = new CloudinaryStorage({
+  cloudinary,
+  params: async (req, file) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    let folder = "posts";
+
+    if (file.fieldname === "backgroundMusic") folder = "music";
 
     return {
       folder,
-      resource_type: "auto", // handles images, videos, pdfs etc.
+      resource_type: "auto", // auto-detect image, video, audio
+      public_id: `${Date.now()}-${file.originalname.split(".")[0]}`,
     };
   },
 });
+
+
+
+
+
 
 
 const upload = multer({ storage });

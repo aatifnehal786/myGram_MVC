@@ -14,4 +14,5 @@ router.get("/allusers1", auth, getAllUsersExceptMe);
 router.get("/allusers2", auth, getAllUsers);
 
 
+
 export default router

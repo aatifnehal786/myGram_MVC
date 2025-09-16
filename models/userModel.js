@@ -29,7 +29,7 @@ const userSchema = new Schema({
       message: (props) => `${props.value} is not a valid mobile number!`
     }
   },
-  profilePic: { type: String },
+  profilePic: { type: String,default:"" },
   chatPin: { type: String, default: null },
   followers: [{ type: mongoose.Schema.Types.ObjectId, ref: "users" }],
   following: [{ type: mongoose.Schema.Types.ObjectId, ref: "users" }],

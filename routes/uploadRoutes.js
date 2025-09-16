@@ -1,40 +1,46 @@
 import express from "express";
 import auth from "../middlewares/auth.js";
-import { upload, uploadProfilePic } from "../middlewares/cloudinary_middleware.js";
+import { upload } from "../middlewares/cloudinary_middleware.js";
+import { uploadProfilePic } from "../middlewares/cloudinary_middleware.js";
+import { uploadProfilePic as uploadProfilePicController } from "../controllers/uploadProfilePic.js";
+import { createPost } from "../controllers/createPostsController.js";
 
 const router = express.Router();
 
-// Controller functions
-const handleProfileUpload = (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({ message: "No file uploaded" });
-    }
-    res.json({
-      message: "Profile picture uploaded successfully",
-      fileUrl: req.file.path, // or secure_url if using cloudinary
-    });
-  } catch (err) {
-    res.status(500).json({ message: "Error uploading profile picture", error: err.message });
-  }
-};
+// ✅ Upload Profile Pic route
+router.post(
+  "/profile",
+  auth, // ensure user is authenticated
+  uploadProfilePic.single("profilePic"),
+  uploadProfilePicController
+);
 
-const handlePostUpload = (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({ message: "No media uploaded" });
-    }
-    res.json({
-      message: "Post uploaded successfully",
-      fileUrl: req.file.path,
-    });
-  } catch (err) {
-    res.status(500).json({ message: "Error uploading post", error: err.message });
-  }
-};
+// ✅ Create Post route
+router.post(
+  "/create",
+  auth,
+  upload.fields([
+    { name: "image", maxCount: 1 },
+    { name: "backgroundMusic", maxCount: 1 },
+  ]),
 
-// Routes
-router.post("/profile", auth, uploadProfilePic.single("image"), handleProfileUpload);
-router.post("/post", auth, upload.single("media"), handlePostUpload);
+  // Multer error handler
+  (err, req, res, next) => {
+    if (err) {
+      console.error("⚠️ Multer upload error:", err);
+      return res.status(400).json({ error: err.message });
+    }
+    next();
+  },
+
+  // Debugging middleware
+  (req, res, next) => {
+    console.log("📂 Incoming files:", req.files);
+    console.log("📝 Incoming body:", req.body);
+    next();
+  },
+
+  createPost
+);
 
 export default router;

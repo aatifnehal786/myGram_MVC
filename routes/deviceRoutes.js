@@ -13,7 +13,7 @@ const router = express.Router();
 router.post("/verify-device-otp", verifyDeviceOtp);
 
 // ✅ Get all devices
-router.get("/", auth, getDevices);
+router.get("/devices", auth, getDevices);
 
 // ✅ Remove one device
 router.delete("/:deviceId", auth, removeDevice);
