@@ -84,14 +84,15 @@ export const removeDevice = async (req, res) => {
   try {
     const { deviceId } = req.params;
     const user = await User.findById(req.user._id);
+    console.log(req.user._id)
     if (!user) return res.status(404).json({ message: "User not found" });
 
     const originalLength = user.devices.length;
     user.devices = user.devices.filter((d) => d.deviceId !== deviceId);
 
-    if (user.devices.length === originalLength) {
-      return res.status(404).json({ message: "Device not found" });
-    }
+    // if (user.devices.length === originalLength) {
+    //   return res.status(404).json({ message: "Device not found" });
+    // }
 
     await user.save();
     res.json({ message: "Device removed", devices: user.devices });
