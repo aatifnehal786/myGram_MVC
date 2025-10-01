@@ -3,13 +3,12 @@ dotenv.config();
 import nodemailer from "nodemailer";
 
 const transporter = nodemailer.createTransport({
-  service: "gmail",
-  host: "smtp.gmail.com",   // or smtp.mailtrap.io, smtp.office365.com, etc.
-  port: 587,                // 465 if using secure:true
-  secure: false, 
+  host: "smtp.gmail.com",
+  port: 465,                  // ✅ use 465 for Gmail
+  secure: true,               // ✅ must be true with port 465
   auth: {
     user: process.env.MY_GMAIL,
-    pass: process.env.GMAIL_PASSWORD,
+    pass: process.env.GMAIL_PASSWORD, // must be an App Password
   },
 });
 
@@ -21,4 +20,3 @@ export const sendOtpEmail = async (to, otp) => {
     text: `Your OTP code is ${otp}. It will expire in 10 minutes.`,
   });
 };
-
