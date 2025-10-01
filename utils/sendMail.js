@@ -1,20 +1,17 @@
 import dotenv from "dotenv";
 dotenv.config();
 import nodemailer from "nodemailer";
+import sgTransport from "nodemailer-sendgrid";
 
-const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
-  port: 465,                  // ✅ use 465 for Gmail
-  secure: true,               // ✅ must be true with port 465
-  auth: {
-    user: process.env.MY_GMAIL,
-    pass: process.env.GMAIL_PASSWORD, // must be an App Password
-  },
-});
+const transporter = nodemailer.createTransport(
+  sgTransport({
+    apiKey: process.env.SENDGRID_API_KEY,
+  })
+);
 
 export const sendOtpEmail = async (to, otp) => {
   return transporter.sendMail({
-    from: `"Instagram Clone" <${process.env.MY_GMAIL}>`,
+    from: `"Instagram Clone" <no-reply@aatifnehal.com>`, // use a verified sender
     to,
     subject: "Your OTP Code",
     text: `Your OTP code is ${otp}. It will expire in 10 minutes.`,
