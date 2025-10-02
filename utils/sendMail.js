@@ -11,7 +11,7 @@ const transporter = nodemailer.createTransport(
 
 export const sendOtpEmail = async (to, otp) => {
   return transporter.sendMail({
-    from: `"Instagram Clone" <no-reply@yourdomain.com>`, // must be verified in SendGrid
+    from: `"Instagram Clone" <no-reply@aatifnehal786`, // must be verified in SendGrid
     to,
     subject: "Your OTP Code",
     text: `Your OTP code is ${otp}. It will expire in 10 minutes.`,
