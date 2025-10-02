@@ -1,20 +1,12 @@
+import Resend from "resend";
 import dotenv from "dotenv";
 dotenv.config();
-import nodemailer from "nodemailer";
 
-const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
-  port: 465,                  // ✅ use 465 for Gmail
-  secure: true,               // ✅ must be true with port 465
-  auth: {
-    user: process.env.MY_GMAIL,
-    pass: process.env.GMAIL_PASSWORD, // must be an App Password
-  },
-});
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 export const sendOtpEmail = async (to, otp) => {
-  return transporter.sendMail({
-    from: `"Instagram Clone" <${process.env.MY_GMAIL}>`,
+  await resend.emails.send({
+    from: "Instagram Clone <no-reply@yourdomain.com>",
     to,
     subject: "Your OTP Code",
     text: `Your OTP code is ${otp}. It will expire in 10 minutes.`,
