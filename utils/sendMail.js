@@ -6,7 +6,7 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 
 export const sendOtpEmail = async (to, otp) => {
   await resend.emails.send({
-    from: "Instagram Clone <no-reply@yourdomain.com>",
+    from: "Instagram Clone <no-reply@mygram247.netlify.app>",
     to,
     subject: "Your OTP Code",
     text: `Your OTP code is ${otp}. It will expire in 10 minutes.`,
