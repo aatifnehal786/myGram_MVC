@@ -1,29 +1,27 @@
-import nodemailer from "nodemailer";
+// utils/sendMail.js
+import fetch from "node-fetch";
 import dotenv from "dotenv";
 dotenv.config();
 
-// Create transporter
-const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
-  port: 465,       // Use 465 for secure SSL
-  secure: true,    // Must be true with port 465
-  auth: {
-    user: process.env.MY_GMAIL,
-    pass: process.env.GMAIL_APP_PASS,
-  },
-});
-
-// Send OTP email
 export const sendOtpEmail = async (to, otp) => {
   try {
-    const info = await transporter.sendMail({
-      from: `"Instagram Clone" <${process.env.MY_GMAIL}>`,
-      to,
-      subject: "Your OTP Code",
-      text: `Your OTP code is ${otp}. It will expire in 10 minutes.`,
+    const res = await fetch("https://api.brevo.com/v3/smtp/email", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "api-key": process.env.BREVO_API_KEY,
+      },
+      body: JSON.stringify({
+        sender: { name: "Instagram Clone", email: "nehalahmed05011967@gmail.com" },
+        to: [{ email: to }],
+        subject: "Your OTP Code",
+        textContent: `Your OTP code is ${otp}. It will expire in 10 minutes.`,
+      }),
     });
-    console.log("OTP email sent:", info.messageId);
-    return info;
+
+    const data = await res.json();
+    console.log("Brevo response:", data);
+    return data;
   } catch (error) {
     console.error("Error sending OTP email:", error);
     throw new Error("Failed to send OTP email");
