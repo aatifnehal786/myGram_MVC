@@ -71,7 +71,7 @@ export const getDevices = async (req, res) => {
   try {
     const user = await User.findById(req.user._id).select("devices");
     if (!user) return res.status(404).json({ message: "User not found" });
-
+    console.log(user.devices);
     res.json({ devices: user.devices });
   } catch (err) {
     console.error("Fetch devices error:", err);
