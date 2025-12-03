@@ -24,28 +24,57 @@ function socketHandler(server) {
     });
 
     socket.on("sendMessage", async ({ senderId, receiverId, message, fileUrl, fileType, isForwarded }) => {
-      try {
-        const newMsg = await Message.create({
-          sender: senderId,
-          receiver: receiverId,
-          message: message || "",
-          fileUrl: fileUrl || null,
-          fileType: fileType || null,
-          isForwarded: isForwarded || false,
-          createdAt: new Date()
-        });
-
-        const sendToUserSockets = (userId, msg) => {
-          const sockets = global.onlineUsers.get(userId);
-          if (sockets) sockets.forEach(sockId => io.to(sockId).emit("receiveMessage", msg));
-        };
-
-        sendToUserSockets(senderId, newMsg);
-        sendToUserSockets(receiverId, newMsg);
-      } catch (err) {
-        console.error("Error in sendMessage:", err);
-      }
+  try {
+    const newMsg = await Message.create({
+      sender: senderId,
+      receiver: receiverId,
+      message,
+      fileUrl,
+      fileType,
+      isForwarded,
+      isDelivered: global.onlineUsers.has(receiverId)
     });
+
+    const sendToUserSockets = (userId, msg) => {
+      const sockets = global.onlineUsers.get(userId);
+      if (sockets) sockets.forEach(sockId => io.to(sockId).emit("receiveMessage", msg));
+    };
+
+    sendToUserSockets(senderId, newMsg);
+    sendToUserSockets(receiverId, newMsg);
+
+  } catch (err) {
+    console.error("Error sending:", err);
+  }
+});
+
+
+// mark chats as seen
+
+socket.on("markSeen", async ({ userId, otherUserId }) => {
+  await Message.updateMany(
+    { sender: otherUserId, receiver: userId, isSeen: false },
+    { isSeen: true, seenAt: new Date() }
+  );
+
+  // notify sender about seen
+  const sockets = global.onlineUsers.get(otherUserId);
+  if (sockets) sockets.forEach(id => io.to(id).emit("messagesSeen", { userId }));
+});
+
+
+// typing indicator Event Call
+
+socket.on("typing", ({ senderId, receiverId }) => {
+  const sockets = global.onlineUsers.get(receiverId);
+  if (sockets) sockets.forEach(id => io.to(id).emit("typing", senderId));
+});
+
+socket.on("stopTyping", ({ senderId, receiverId }) => {
+  const sockets = global.onlineUsers.get(receiverId);
+  if (sockets) sockets.forEach(id => io.to(id).emit("stopTyping", senderId));
+});
+
 
     socket.on("disconnect", async () => {
       for (let [userId, socketSet] of global.onlineUsers.entries()) {
