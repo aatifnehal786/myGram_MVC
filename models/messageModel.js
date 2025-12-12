@@ -22,7 +22,8 @@ const MessageSchema = new mongoose.Schema(
     isSeen: { type: Boolean, default: false },
     seenAt: { type: Date, default: null },
     createdAt: { type: Date, default: Date.now},
-    lastSeen: { type: Date }
+    lastSeen: { type: Date },
+    isOnline: {type:Boolean, default:false}
 
 
   },
