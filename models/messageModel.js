@@ -20,7 +20,7 @@ const MessageSchema = new mongoose.Schema(
     deliveredAt: { type: Date, default: null },
 
     isSeen: { type: Boolean, default: false },
-    seenAt: { type: Date, default: Date.now },
+    seenAt: { type: Date, default: null },
     createdAt: { type: Date, default: Date.now},
     lastSeen: { type: Date }
 
