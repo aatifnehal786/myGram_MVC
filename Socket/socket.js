@@ -15,28 +15,31 @@ function socketHandler(server) {
   });
 
   // userId -> Set(socketId)
-  global.onlineUsers = new Map();
-
   io.on("connection", (socket) => {
-    console.log("New socket connected:", socket.id);
+  console.log("Socket connected:", socket.id);
 
-    /* =========================
-       USER JOIN
-    ========================== */
-    socket.on("join", async (userId) => {
-      socket.userId = userId;
+  socket.on("join", async (userId) => {
+    socket.userId = userId;
 
-      if (!global.onlineUsers.has(userId)) {
-        global.onlineUsers.set(userId, new Set());
-      }
-      global.onlineUsers.get(userId).add(socket.id);
+    if (!global.onlineUsers.has(userId)) {
+      global.onlineUsers.set(userId, new Set());
+    }
 
-      await User.findByIdAndUpdate(userId, { isOnline: true });
+    global.onlineUsers.get(userId).add(socket.id);
 
-      io.emit("user-online", { userId });
-      io.emit("onlineUsers", Array.from(global.onlineUsers.keys()));
-    });
+    await User.findByIdAndUpdate(userId, { isOnline: true });
 
+    // 🔔 Notify OTHER users only
+    socket.broadcast.emit("user-online", { userId });
+  });
+
+  // ✅ Client requests current online users
+  socket.on("get-online-users", () => {
+    socket.emit(
+      "online-users",
+      Array.from(global.onlineUsers.keys())
+    );
+  });
     /* =========================
        CHAT OPEN (IMPORTANT)
     ========================== */
@@ -147,26 +150,29 @@ function socketHandler(server) {
        DISCONNECT
     ========================== */
     socket.on("disconnect", async () => {
-      for (let [userId, socketSet] of global.onlineUsers.entries()) {
-        socketSet.delete(socket.id);
+    const userId = socket.userId;
+    if (!userId) return;
 
-        if (socketSet.size === 0) {
-          global.onlineUsers.delete(userId);
+    const sockets = global.onlineUsers.get(userId);
+    if (sockets) {
+      sockets.delete(socket.id);
 
-          const lastSeen = new Date();
-          await User.findByIdAndUpdate(userId, {
-            isOnline: false,
-            lastSeen,
-          });
+      if (sockets.size === 0) {
+        global.onlineUsers.delete(userId);
 
-          io.emit("user-offline", { userId, lastSeen });
-        }
+        await User.findByIdAndUpdate(userId, {
+          isOnline: false,
+          lastSeen: new Date()
+        });
+
+        socket.broadcast.emit("user-offline", {
+          userId,
+          lastSeen: new Date()
+        });
       }
-
-      io.emit("onlineUsers", Array.from(global.onlineUsers.keys()));
-      console.log("Socket disconnected:", socket.id);
-    });
+    }
   });
+});
 }
 
 export default socketHandler;
