@@ -44,6 +44,11 @@ function socketHandler(server) {
       socket.chattingWith = chattingWith;
     });
 
+    socket.on("chatClose", () => {
+      socket.chattingWith = null;
+    });
+
+
     /* =========================
        SEND MESSAGE
     ========================== */
@@ -77,19 +82,23 @@ function socketHandler(server) {
 
           // 🔔 Send notification ONLY if chat not open
           const receiverSockets = global.onlineUsers.get(receiverId);
+
           if (receiverSockets) {
             receiverSockets.forEach((sockId) => {
               const sock = io.sockets.sockets.get(sockId);
+              if (!sock) return;
 
-              if (sock?.chattingWith === senderId) return;
+              // 🚫 Suppress ONLY if chat is actively open
+              if (sock.chattingWith === senderId) return;
 
               io.to(sockId).emit("newNotification", {
                 senderId,
-                message: message || "New message",
+                text: message || "New message",
                 messageId: newMessage._id,
               });
             });
           }
+
         } catch (err) {
           console.error("Send message error:", err);
         }
