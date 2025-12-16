@@ -15,31 +15,38 @@ function socketHandler(server) {
   });
 
   // userId -> Set(socketId)
+  global.onlineUsers = new Map();
+
   io.on("connection", (socket) => {
-  console.log("Socket connected:", socket.id);
+    console.log("New socket connected:", socket.id);
 
-  socket.on("join", async (userId) => {
-    socket.userId = userId;
+        /* =========================
+       USER JOIN
+    ========================== */
+    socket.on("join", async (userId) => {
+      socket.userId = userId;
 
-    if (!global.onlineUsers.has(userId)) {
-      global.onlineUsers.set(userId, new Set());
-    }
+      if (!global.onlineUsers.has(userId)) {
+        global.onlineUsers.set(userId, new Set());
+      }
+      global.onlineUsers.get(userId).add(socket.id);
 
-    global.onlineUsers.get(userId).add(socket.id);
+      await User.findByIdAndUpdate(userId, { isOnline: true });
 
-    await User.findByIdAndUpdate(userId, { isOnline: true });
+      // 🔔 Notify others ONLY
+      socket.broadcast.emit("user-online", { userId });
+    });
 
-    // 🔔 Notify OTHER users only
-    socket.broadcast.emit("user-online", { userId });
-  });
+    /* =========================
+       ONLINE USERS SNAPSHOT
+    ========================== */
+    socket.on("get-online-users", () => {
+      socket.emit(
+        "online-users",
+        Array.from(global.onlineUsers.keys())
+      );
+    });
 
-  // ✅ Client requests current online users
-  socket.on("get-online-users", () => {
-    socket.emit(
-      "online-users",
-      Array.from(global.onlineUsers.keys())
-    );
-  });
     /* =========================
        CHAT OPEN (IMPORTANT)
     ========================== */
@@ -57,7 +64,7 @@ function socketHandler(server) {
     ========================== */
     socket.on(
       "sendMessage",
-      async ({ senderId, receiverId, message, fileUrl, fileType, isForwarded }) => {
+      async ({ senderId, receiverId, message,  }) => {
         try {
           const newMessage = await Message.create({
             sender: senderId,
@@ -150,29 +157,38 @@ function socketHandler(server) {
        DISCONNECT
     ========================== */
     socket.on("disconnect", async () => {
-    const userId = socket.userId;
-    if (!userId) return;
+  const userId = socket.userId;
+  if (!userId) return;
 
-    const sockets = global.onlineUsers.get(userId);
-    if (sockets) {
-      sockets.delete(socket.id);
+  const socketSet = global.onlineUsers.get(userId);
+  if (!socketSet) return;
 
-      if (sockets.size === 0) {
-        global.onlineUsers.delete(userId);
+  // Remove only this socket
+  socketSet.delete(socket.id);
 
-        await User.findByIdAndUpdate(userId, {
-          isOnline: false,
-          lastSeen: new Date()
-        });
+  // If user has no active sockets → offline
+  if (socketSet.size === 0) {
+    global.onlineUsers.delete(userId);
 
-        socket.broadcast.emit("user-offline", {
-          userId,
-          lastSeen: new Date()
-        });
-      }
-    }
-  });
-});
+    const lastSeen = new Date();
+
+    await User.findByIdAndUpdate(userId, {
+      isOnline: false,
+      lastSeen,
+    });
+
+    // 🔔 Notify OTHER users only
+    socket.broadcast.emit("user-offline", {
+      userId,
+      lastSeen,
+    });
+  }
+
+  console.log("Socket disconnected:", socket.id);
+})
+})
+
 }
 
 export default socketHandler;
+
