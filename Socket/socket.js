@@ -64,7 +64,7 @@ function socketHandler(server) {
     ========================== */
     socket.on(
       "sendMessage",
-      async ({ senderId, receiverId, message,  }) => {
+      async ({ senderId, receiverId, message,fileType,fileUrl,isForwarded  }) => {
         try {
           const newMessage = await Message.create({
             sender: senderId,
