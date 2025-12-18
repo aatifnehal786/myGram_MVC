@@ -174,98 +174,6 @@ const forwardMessage = async (req, res) => {
   }
 };
 
-// Chat PIN functions
-const setChatPin = async (req, res) => {
-  try {
-    const { userId, pin } = req.body;
-    if (!/^\d{4}$/.test(pin))
-      return res.status(400).json({ msg: "PIN must be 4 digits" });
-
-    const hashedPin = await bcrypt.hash(pin, 10);
-    await User.findByIdAndUpdate(userId, { chatPin: hashedPin });
-
-    res.json({ msg: "Chat PIN set successfully" });
-  } catch {
-    res.status(500).json({ msg: "Server error" });
-  }
-};
-
-const verifyChatPin = async (req, res) => {
-  const { userId, pin } = req.body;
-  const user = await User.findById(userId);
-  if (!user || !user.chatPin) return res.status(404).json({ message: "PIN not set" });
-
-  const isMatch = await bcrypt.compare(pin, user.chatPin);
-  if (!isMatch) return res.status(400).json({ message: "Invalid PIN" });
-
-  res.json({ message: "PIN verified successfully" });
-};
-
-const checkChatPin = async (req, res) => {
-  try {
-    const { userId } = req.body;
-    const user = await User.findById(userId);
-    if (!user) return res.status(404).json({ msg: "User not found" });
-    res.json({
-      hasPin: !!user.chatPin,
-      msg: user.chatPin ? "Chat PIN already set" : "No PIN set yet",
-    });
-  } catch {
-    res.status(500).json({ msg: "Server error" });
-  }
-};
-
-// OTP for forgot PIN
-const forgotChatPin = async (req, res) => {
-  const { email } = req.body;
-  const user = await User.findOne({ email });
-  if (!user) return res.status(404).json({ message: "User not registered with this email" });
-
-  const otp = crypto.randomInt(100000, 999999).toString();
-  chatPinOtpStorage[email] = { otp, expiresAt: Date.now() + 5 * 60 * 1000, userId: user._id };
-
-  try {
-    await transporter.sendMail({
-      from: `"MyGram Chat PIN Recovery" <${process.env.MY_GMAIL}>`,
-      to: email,
-      subject: "Your Chat PIN OTP",
-      text: `Your OTP to reset your chat PIN is ${otp}. It will expire in 5 minutes.`,
-    });
-    res.json({ message: "OTP sent successfully" });
-  } catch (err) {
-    console.error("Error sending OTP:", err);
-    res.status(500).json({ error: "Failed to send OTP" });
-  }
-};
-
-const resetChatPin = async (req, res) => {
-  const { email, otp, newPin } = req.body;
-  const record = chatPinOtpStorage[email];
-  if (!record) return res.status(400).json({ message: "No OTP requested for this email" });
-  if (record.otp !== otp) return res.status(400).json({ message: "Invalid OTP" });
-  if (Date.now() > record.expiresAt) return res.status(400).json({ message: "OTP expired" });
-
-  const user = await User.findOne({ email });
-  const hashedPin = await bcrypt.hash(newPin.toString(), 10);
-  user.chatPin = hashedPin;
-  await user.save();
-  delete chatPinOtpStorage[email];
-  res.json({ message: "Chat PIN reset successfully" });
-};
-
-const removeChatPin = async (req, res) => {
-  try {
-    const { userId } = req.body;
-    const user = await User.findById(userId);
-    if (!user) return res.status(404).json({ message: "User not found" });
-
-    user.chatPin = null;
-    await user.save();
-    res.json({ message: "Chat lock removed successfully" });
-  } catch (err) {
-    res.status(500).json({ message: "Error removing chat lock", error: err.message });
-  }
-};
 
 // Export all functions as named exports
 export {
@@ -274,11 +182,5 @@ export {
   getChat,
   searchUsers,
   getChatList,
-  forwardMessage,
-  setChatPin,
-  verifyChatPin,
-  checkChatPin,
-  forgotChatPin,
-  resetChatPin,
-  removeChatPin
+  forwardMessage
 };

@@ -13,7 +13,7 @@ export const sendMobileOtp = async (req, res) => {
 
   try {
     const verification = await client.verify.v2
-      .services(process.env.TWILIO_VERIFY_SID)
+      .services(process.env.TWILLO_SERVICE_SID)
       .verifications.create({ to: `+91${mobile}`, channel: "sms" });
 
     res.json({ message: "OTP sent", status: verification.status });
