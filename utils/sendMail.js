@@ -4,6 +4,9 @@ import dotenv from "dotenv";
 dotenv.config();
 
 
+  
+export const sendOtpEmail = async (to, otp) => {
+
   const html = `
     <div style="font-family: Arial, sans-serif; color: #333; line-height: 1.6;">
       <h2 style="color: #075e54;">🔐 WhatsApp Web Verification</h2>
@@ -27,7 +30,6 @@ dotenv.config();
       <small style="color: #777;">This is an automated message. Please do not reply.</small>
     </div>
   `;
-export const sendOtpEmail = async (to, otp) => {
   try {
     const res = await fetch("https://api.brevo.com/v3/smtp/email", {
       method: "POST",
