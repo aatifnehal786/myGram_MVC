@@ -15,7 +15,14 @@ const forgotPassword = async (req, res) => {
   const otp = crypto.randomInt(100000, 999999).toString();
   otpStorage[email] = { otp, expiresAt: Date.now() +  10* 60 * 1000 };
 
-  await sendOtpEmail(email,otp)
+   try {
+   await sendOtpEmail(email,otp)
+
+    res.json({ message: "OTP sent successfully" });
+  } catch (err) {
+    console.error("Error sending email:", err);
+    res.status(500).json({ error: "Failed to send OTP" });
+  }
 };
 
 const resetPassword = async (req, res) => {
