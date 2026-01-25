@@ -72,29 +72,36 @@ const deleteChatMessages = async (req, res) => {
 };
 
 // Get chat between two users
+// Get chat between two users (paginated)
 const getChat = async (req, res) => {
   try {
     const currentUserId = req.user.id;
     const targetUserId = req.params.userId;
 
+    const limit = parseInt(req.query.limit) || 20;
+    const skip = parseInt(req.query.skip) || 0;
+
     const sender = await User.findById(currentUserId);
     const receiver = await User.findById(targetUserId);
 
-    if (!sender || !receiver)
+    if (!sender || !receiver) {
       return res.status(404).json({ error: "User not found" });
+    }
 
-   const messages = await Message.find({
-  $or: [
-    { sender: currentUserId, receiver: targetUserId },
-    { sender: targetUserId, receiver: currentUserId },
-  ],
-})
-  .sort({ createdAt: 1 })
-  .populate("sender", "_id name username profilePic")
-  .populate("receiver", "_id name username profilePic");
+    const messages = await Message.find({
+      $or: [
+        { sender: currentUserId, receiver: targetUserId },
+        { sender: targetUserId, receiver: currentUserId },
+      ],
+    })
+      .sort({ createdAt: -1 }) // newest first
+      .skip(skip)
+      .limit(limit)
+      .populate("sender", "_id name username profilePic")
+      .populate("receiver", "_id name username profilePic");
 
-
-    res.status(200).json(messages);
+    // Reverse to show oldest → newest in UI
+    res.status(200).json(messages.reverse());
   } catch (err) {
     console.error("Error in /chat/:userId:", err);
     res.status(500).json({ error: "Server error" });
