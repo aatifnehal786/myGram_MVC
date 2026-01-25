@@ -52,7 +52,8 @@ app.use("/api/password", passwordRoutes);
 app.use("/api/user", userRoutes);
 app.use("/api/create-posts",createPosts)
 // mount
-app.use("/otp", otpRoutes);
+app.use("/api/otp", otpRoutes);
+
 
 const PORT = process.env.PORT || 8000;
 server.listen(PORT, () => console.log(` Server running on port ${PORT}`));
