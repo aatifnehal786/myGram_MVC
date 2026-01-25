@@ -41,7 +41,7 @@ export const sendOtpEmail = async (to, otp) => {
         sender: { name: "Instagram Clone", email: "nehalahmed05011967@gmail.com" },
         to: [{ email: to }],
         subject: "Your OTP Code",
-        html,
+        htmlContent: html,
       }),
     });
 
