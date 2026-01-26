@@ -153,6 +153,9 @@ function socketHandler(server) {
       }
     });
 
+     // Handle video call events
+        handleVideoCallEvents(socket, io, onlineUsers)
+
     /* =========================
        DISCONNECT
     ========================== */
