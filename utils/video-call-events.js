@@ -110,4 +110,4 @@ const handleVideoCallEvents = (socket, io, onlineUsers) => {
   })
 }
 
-module.exports = handleVideoCallEvents
+export default handleVideoCallEvents
