@@ -95,7 +95,7 @@ export const updateUserProfile = async (req, res) => {
       return res.status(400).json({ error: "Username is required" });
     }
 
-    const username = newUsername.trim().toLowerCase();
+    const username = newUsername.trim();
 
     // check if username already exists
     const existingUser = await User.findOne({
