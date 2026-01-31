@@ -85,20 +85,43 @@ export const getFollowing = async (req, res) => {
 };
 
 // update username, bio, profilePic
+// update username, bio, profilePic
 export const updateUserProfile = async (req, res) => {
   try {
     const userId = req.user._id;
-    const { username } = req.body;
+    const { newUsername } = req.body;
+
+    if (!newUsername || !newUsername.trim()) {
+      return res.status(400).json({ error: "Username is required" });
+    }
+
+    const username = newUsername.trim().toLowerCase();
+
+    // check if username already exists
+    const existingUser = await User.findOne({
+      username,
+      _id: { $ne: userId },
+    });
+
+    if (existingUser) {
+      return res.status(409).json({ error: "Username already taken" });
+    }
 
     const updatedUser = await User.findByIdAndUpdate(
       userId,
       { username },
-      { new: true }
-    ).select('-password');
-    res.status(200).json(updatedUser);
+      { new: true, runValidators: true }
+    ).select("-password");
+
+    res.status(200).json({
+      message: "Username updated successfully",
+      newUsername: updatedUser.username,
+      user: updatedUser,
+    });
+  } catch (error) {
+    console.error("Update profile error:", error);
+    res.status(500).json({
+      error: "Server error while updating profile",
+    });
   }
-  catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Server error while updating profile' });
-  }   
 };
