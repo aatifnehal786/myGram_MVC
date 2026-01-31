@@ -51,3 +51,54 @@ export const getAllUsers = async (req, res) => {
     res.status(500).json({ error: "Server error while fetching users" });
   }
 };
+
+
+// get Followers of a user
+export const getFollowers = async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const user = await User.findById(userId).populate('followers', 'username profilePic');
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    res.status(200).json(user.followers);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Server error while fetching followers' });
+  }
+};
+
+// get Following of a user
+export const getFollowing = async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const user = await User.findById(userId).populate('following', 'username profilePic');
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.status(200).json(user.following);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Server error while fetching following' });
+  }
+};
+
+// update username, bio, profilePic
+export const updateUserProfile = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { username } = req.body;
+
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { username },
+      { new: true }
+    ).select('-password');
+    res.status(200).json(updatedUser);
+  }
+  catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Server error while updating profile' });
+  }   
+};
