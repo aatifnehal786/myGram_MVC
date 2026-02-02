@@ -19,6 +19,6 @@ router.get("/devices", auth, getDevices);
 router.delete("/devices/:deviceId", auth, removeDevice);
 
 // ✅ Remove all other devices
-router.delete("/devices//remove-others/:currentDeviceId", auth, removeOtherDevices);
+router.delete("/devices/remove-others/:currentDeviceId", auth, removeOtherDevices);
 
 export default router;
