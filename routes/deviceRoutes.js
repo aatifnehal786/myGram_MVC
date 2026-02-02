@@ -16,9 +16,9 @@ router.post("/verify-device-otp", verifyDeviceOtp);
 router.get("/devices", auth, getDevices);
 
 // ✅ Remove one device
-router.delete("/:deviceId", auth, removeDevice);
+router.delete("/devices/:deviceId", auth, removeDevice);
 
 // ✅ Remove all other devices
-router.delete("/remove-others/:currentDeviceId", auth, removeOtherDevices);
+router.delete("/devices//remove-others/:currentDeviceId", auth, removeOtherDevices);
 
 export default router;
