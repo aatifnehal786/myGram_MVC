@@ -82,36 +82,27 @@ export const getDevices = async (req, res) => {
 // ✅ Remove one device
 export const removeDevice = async (req, res) => {
   try {
-    const requiredDeviceId = req.params.deviceId; // ✅ FIX
+    const { deviceId } = req.params;
     const user = await User.findById(req.user._id);
-
-    if (!requiredDeviceId) {
-      return res.status(400).json({ message: "Device ID missing" });
-    }
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    console.log("Removing deviceId:", deviceId);
-    console.log("Before:", user.devices.map(d => d.deviceId));
-
-    const originalLength = user.devices.length;
+    const before = user.devices.length;
 
     user.devices = user.devices.filter(
-      (d) => String(d.deviceId) !== String(requiredDeviceId)
+      (d) => String(d.deviceId).trim() !== String(deviceId).trim()
     );
 
-    console.log("After:", user.devices.map(d => d.deviceId));
-
-    if (user.devices.length === originalLength) {
+    if (user.devices.length === before) {
       return res.status(404).json({ message: "Device not found" });
     }
 
     await user.save();
 
     res.json({
-      message: "Device removed successfully",
+      message: "Device removed",
       devices: user.devices,
     });
   } catch (err) {
@@ -119,6 +110,7 @@ export const removeDevice = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
 
 
 // ✅ Remove all other devices except current
