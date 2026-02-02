@@ -124,7 +124,7 @@ export const removeDevice = async (req, res) => {
 // ✅ Remove all other devices except current
 export const removeOtherDevices = async (req, res) => {
   try {
-    const currentDeviceId = req.headers["device-id"]; // ✅ FIX
+    const currentDeviceId = req.headers['x-device-id'];  // ✅ FIX
     const user = await User.findById(req.user._id);
 
     if (!currentDeviceId) {
