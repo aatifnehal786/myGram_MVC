@@ -82,39 +82,72 @@ export const getDevices = async (req, res) => {
 // ✅ Remove one device
 export const removeDevice = async (req, res) => {
   try {
-    const { deviceId } = req.params;
+    const deviceId = req.headers['x-device-id']; // ✅ FIX
     const user = await User.findById(req.user._id);
-    console.log(req.user._id)
-    if (!user) return res.status(404).json({ message: "User not found" });
+
+    if (!deviceId) {
+      return res.status(400).json({ message: "Device ID missing" });
+    }
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    console.log("Removing deviceId:", deviceId);
+    console.log("Before:", user.devices.map(d => d.deviceId));
 
     const originalLength = user.devices.length;
-    user.devices = user.devices.filter((d) => d.deviceId !== deviceId);
 
-    // if (user.devices.length === originalLength) {
-    //   return res.status(404).json({ message: "Device not found" });
-    // }
+    user.devices = user.devices.filter(
+      (d) => String(d.deviceId) !== String(deviceId)
+    );
+
+    console.log("After:", user.devices.map(d => d.deviceId));
+
+    if (user.devices.length === originalLength) {
+      return res.status(404).json({ message: "Device not found" });
+    }
 
     await user.save();
-    res.json({ message: "Device removed", devices: user.devices });
+
+    res.json({
+      message: "Device removed successfully",
+      devices: user.devices,
+    });
   } catch (err) {
     console.error("Remove device error:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
 
+
 // ✅ Remove all other devices except current
 export const removeOtherDevices = async (req, res) => {
   try {
-    const { currentDeviceId } = req.params;
+    const currentDeviceId = req.headers["device-id"]; // ✅ FIX
     const user = await User.findById(req.user._id);
-    if (!user) return res.status(404).json({ message: "User not found" });
 
-    user.devices = user.devices.filter((d) => d.deviceId === currentDeviceId);
+    if (!currentDeviceId) {
+      return res.status(400).json({ message: "Current device ID missing" });
+    }
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    user.devices = user.devices.filter(
+      (d) => String(d.deviceId) === String(currentDeviceId)
+    );
+
     await user.save();
 
-    res.json({ message: "Removed all other devices", devices: user.devices });
+    res.json({
+      message: "Removed all other devices",
+      devices: user.devices,
+    });
   } catch (err) {
     console.error("Remove other devices error:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
+
