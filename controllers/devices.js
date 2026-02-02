@@ -82,10 +82,10 @@ export const getDevices = async (req, res) => {
 // ✅ Remove one device
 export const removeDevice = async (req, res) => {
   try {
-    const deviceId = req.params.deviceId; // ✅ FIX
+    const requiredDeviceId = req.params.deviceId; // ✅ FIX
     const user = await User.findById(req.user._id);
 
-    if (!deviceId) {
+    if (!requiredDeviceId) {
       return res.status(400).json({ message: "Device ID missing" });
     }
 
@@ -99,7 +99,7 @@ export const removeDevice = async (req, res) => {
     const originalLength = user.devices.length;
 
     user.devices = user.devices.filter(
-      (d) => String(d.deviceId) !== String(deviceId)
+      (d) => String(d.deviceId) !== String(requiredDeviceId)
     );
 
     console.log("After:", user.devices.map(d => d.deviceId));
