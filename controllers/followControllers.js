@@ -62,5 +62,99 @@ const getFollowers = async (req, res) => {
   }
 };
 
+// POST /api/follow/request/:userId
+const sendFollowRequest = async (req, res) => {
+  try {
+    const senderId = req.user._id;
+    const receiverId = req.params.userId;
 
-export {getFollowers,followStatus,unfollowUser,followUser}
+    if (senderId.equals(receiverId)) {
+      return res.status(400).json({ message: "Cannot follow yourself" });
+    }
+
+    const receiver = await User.findById(receiverId);
+    if (!receiver) return res.status(404).json({ message: "User not found" });
+
+    if (
+      receiver.followRequests.includes(senderId) ||
+      receiver.followers.includes(senderId)
+    ) {
+      return res.status(400).json({ message: "Already requested or following" });
+    }
+
+    receiver.followRequests.push(senderId);
+    await receiver.save();
+
+    res.json({ message: "Follow request sent" });
+  } catch (err) {
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+
+// GET /api/follow/requests
+const getFollowRequests = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id)
+      .populate("followRequests", "username profilePic");
+
+    res.json(user.followRequests);
+  } catch (err) {
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// POST /api/follow/accept/:senderId
+const acceptFollowRequest = async (req, res) => {
+  try {
+    const receiverId = req.user._id;
+    const senderId = req.params.senderId;
+
+    const receiver = await User.findById(receiverId);
+    const sender = await User.findById(senderId);
+
+    if (!receiver || !sender) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Remove request
+    receiver.followRequests = receiver.followRequests.filter(
+      (id) => id.toString() !== senderId
+    );
+
+    // Add follower / following
+    receiver.followers.push(senderId);
+    sender.following.push(receiverId);
+
+    await receiver.save();
+    await sender.save();
+
+    res.json({
+      message: "Follow request accepted",
+      followersCount: receiver.followers.length,
+      followingCount: sender.following.length,
+    });
+  } catch (err) {
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// POST /api/follow/reject/:senderId
+const rejectFollowRequest = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+
+    user.followRequests = user.followRequests.filter(
+      (id) => id.toString() !== req.params.senderId
+    );
+
+    await user.save();
+
+    res.json({ message: "Follow request rejected" });
+  } catch (err) {
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+
+export {getFollowers,followStatus,unfollowUser,followUser,sendFollowRequest,getFollowRequests,acceptFollowRequest,rejectFollowRequest};
