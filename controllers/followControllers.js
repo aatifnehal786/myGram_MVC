@@ -27,15 +27,26 @@ const unfollowUser = async (req, res) => {
 };
 
 // Follow status
+// GET /api/follow-status/:targetUserId
 const followStatus = async (req, res) => {
   const currentUserId = req.user._id;
   const { targetUserId } = req.params;
 
-  const currentUser = await User.findById(currentUserId);
-  if (!currentUser) return res.status(404).json({ error: "User not found" });
+  const targetUser = await User.findById(targetUserId);
+  if (!targetUser) {
+    return res.status(404).json({ message: "User not found" });
+  }
 
-  const isFollowing = currentUser.following.includes(targetUserId);
-  res.json({ isFollowing });
+  const isFollowing = targetUser.followers.includes(currentUserId);
+  const isRequested = targetUser.followRequests?.includes(currentUserId);
+
+  res.json({
+    status: isFollowing
+      ? "following"
+      : isRequested
+      ? "requested"
+      : "none",
+  });
 };
 
 // Followers list with online status
