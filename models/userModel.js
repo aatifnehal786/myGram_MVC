@@ -42,9 +42,7 @@ const userSchema = new Schema({
 
   // OPTIONAL: global setting for trusting device lifetime (0 = never expire)
   // If you want "device trust expiry" policy, set days here (e.g. 90)
-  trustedDeviceExpiryDays: { type: Number, default: 0 },
-
-followRequests: [{ type: mongoose.Schema.Types.ObjectId, ref: "users" }],
+  trustedDeviceExpiryDays: { type: Number, default: 0 }
 
 },
 {
