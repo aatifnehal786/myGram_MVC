@@ -126,7 +126,7 @@ const getFollowRequests = async (req, res) => {
     const user = await User.findById(req.user._id)
       .populate("followRequests", "username profilePic");
 
-    res.json(user.followRequests);
+    res.json({requests:user.followRequests});
   } catch (err) {
     res.status(500).json({ message: "Server error" });
   }
