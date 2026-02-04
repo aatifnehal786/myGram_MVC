@@ -202,13 +202,22 @@ const sendFollowRequest = async (req, res) => {
 const getFollowRequests = async (req, res) => {
   try {
     const user = await User.findById(req.user._id)
+      .select("followRequests")
       .populate("followRequests", "username profilePic");
 
-    res.json({requests:user.followRequests});
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.status(200).json({
+      requests: user.followRequests,
+    });
   } catch (err) {
+    console.error("Get follow requests error:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
+
 
 // POST /api/follow/accept/:senderId
 const acceptFollowRequest = async (req, res) => {
