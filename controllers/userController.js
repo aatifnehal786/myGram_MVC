@@ -33,13 +33,16 @@ export const getUserStats = async (req, res) => {
 export const getAllUsersExceptMe = async (req, res) => {
   try {
     const loggedInUserId = req.user._id;
+
     const users = await User.find({ _id: { $ne: loggedInUserId } });
+
     res.status(200).json(users);
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Server error while fetching users" });
   }
 };
+
 
 // Get all users (including current)
 export const getAllUsers = async (req, res) => {

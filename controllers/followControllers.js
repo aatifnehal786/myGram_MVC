@@ -27,27 +27,35 @@ const unfollowUser = async (req, res) => {
 };
 
 // Follow status
-// GET /api/follow-status/:targetUserId
 const followStatus = async (req, res) => {
-  const currentUserId = req.user._id;
-  const { targetUserId } = req.params;
+  try {
+    const loggedUserId = req.user._id;
+    const { targetUserId } = req.params;
 
-  const targetUser = await User.findById(targetUserId);
-  if (!targetUser) {
-    return res.status(404).json({ message: "User not found" });
+    const targetUser = await User.findById(targetUserId);
+
+    if (!targetUser) {
+      return res.status(404).json({ status: "follow" });
+    }
+
+    // ✅ Already following
+    if (targetUser.followers.includes(loggedUserId)) {
+      return res.json({ status: "following" });
+    }
+
+    // ✅ Follow request pending
+    if (targetUser.followRequests.includes(loggedUserId)) {
+      return res.json({ status: "requested" });
+    }
+
+    // ✅ Default
+    return res.json({ status: "follow" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ status: "follow" });
   }
-
-  const isFollowing = targetUser.followers.includes(currentUserId);
-  const isRequested = targetUser.followRequests?.includes(currentUserId);
-
-  res.json({
-    status: isFollowing
-      ? "following"
-      : isRequested
-      ? "requested"
-      : "none",
-  });
 };
+
 
 // Followers list with online status
 const getFollowers = async (req, res) => {
@@ -84,24 +92,33 @@ const sendFollowRequest = async (req, res) => {
     }
 
     const receiver = await User.findById(receiverId);
-    if (!receiver) return res.status(404).json({ message: "User not found" });
+    if (!receiver) {
+      return res.status(404).json({ message: "User not found" });
+    }
 
     if (
       receiver.followRequests.includes(senderId) ||
       receiver.followers.includes(senderId)
     ) {
-      return res.status(400).json({ message: "Already requested or following" });
+      return res.status(400).json({
+        message: "Already requested or following",
+        status: "requested",
+      });
     }
 
     receiver.followRequests.push(senderId);
     await receiver.save();
 
-    res.json({ message: "Follow request sent" });
+    // ✅ RETURN STATUS
+    res.json({
+      message: "Follow request sent",
+      status: "requested",
+    });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ message: "Server error" });
   }
 };
-
 
 // GET /api/follow/requests
 const getFollowRequests = async (req, res) => {
