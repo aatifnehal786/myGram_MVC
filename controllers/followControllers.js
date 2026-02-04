@@ -14,52 +14,17 @@ const followUser = async (req, res) => {
 };
 
 // Unfollow
-// Unfollow user
 const unfollowUser = async (req, res) => {
-  try {
-    const currentUserId = req.user._id;
-    const { targetUserId } = req.params;
+  const currentUserId = req.user._id;
+  const { targetUserId } = req.params;
 
-    if (!targetUserId) {
-      return res.status(400).json({ error: "Target user id is required" });
-    }
+  if (!targetUserId) return res.status(400).json({ error: "Missing userId" });
 
-    if (currentUserId.toString() === targetUserId) {
-      return res.status(400).json({ error: "You cannot unfollow yourself" });
-    }
+  await User.findByIdAndUpdate(currentUserId, { $pull: { following: targetUserId } });
+  await User.findByIdAndUpdate(targetUserId, { $pull: { followers: currentUserId } });
 
-    const targetUser = await User.findById(targetUserId);
-    const currentUser = await User.findById(currentUserId);
-
-    if (!targetUser || !currentUser) {
-      return res.status(404).json({ error: "User not found" });
-    }
-
-    // 🔴 Remove from following & followers
-    await User.findByIdAndUpdate(currentUserId, {
-      $pull: {
-        following: targetUserId,
-        followRequestsSent: targetUserId, // safety cleanup
-      },
-    });
-
-    await User.findByIdAndUpdate(targetUserId, {
-      $pull: {
-        followers: currentUserId,
-        followRequestsReceived: currentUserId, // safety cleanup
-      },
-    });
-
-    return res.status(200).json({
-      message: "Unfollowed successfully",
-      status: "follow",
-    });
-  } catch (error) {
-    console.error("Unfollow error:", error);
-    res.status(500).json({ error: "Server error while unfollowing" });
-  }
+  res.json({ message: "Unfollowed" });
 };
-
 
 // Follow status
 const followStatus = async (req, res) => {
