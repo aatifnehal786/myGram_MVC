@@ -2,7 +2,7 @@ import  express from 'express';
 import auth from '../middlewares/auth.js'
 import {followUser,unfollowUser,
   followStatus,
-  getFollowers,sendFollowRequest,getFollowRequests,acceptFollowRequest,rejectFollowRequest} from '../controllers/followControllers.js'
+  getFollowers,sendFollowRequest,getFollowRequests,acceptFollowRequest,rejectFollowRequest,cancelFollowRequest} from '../controllers/followControllers.js'
 
 const router = express.Router();
 
@@ -14,5 +14,6 @@ router.post("/follow/request/:userId", auth, sendFollowRequest);
 router.get("/follow/requests", auth, getFollowRequests);
 router.post("/follow/accept/:senderId", auth, acceptFollowRequest);
 router.post("/follow/reject/:senderId", auth, rejectFollowRequest);
+router.post("/follow/cancel/:userId", auth, cancelFollowRequest);
 
 export default router

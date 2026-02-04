@@ -184,5 +184,29 @@ const rejectFollowRequest = async (req, res) => {
   }
 };
 
+// POST /api/follow/cancel/:userId
+const cancelFollowRequest = async (req, res) => {
+  try {
+    const senderId = req.user._id;
+    const receiverId = req.params.userId;
 
-export {getFollowers,followStatus,unfollowUser,followUser,sendFollowRequest,getFollowRequests,acceptFollowRequest,rejectFollowRequest};
+    const receiver = await User.findById(receiverId);
+    if (!receiver) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Remove sender from followRequests
+    receiver.followRequests = receiver.followRequests.filter(
+      (id) => id.toString() !== senderId.toString()
+    );
+
+    await receiver.save();
+
+    res.json({ status: "follow", message: "Follow request cancelled" });
+  } catch (err) {
+    console.error("Cancel follow request error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+export {getFollowers,followStatus,unfollowUser,followUser,sendFollowRequest,getFollowRequests,acceptFollowRequest,rejectFollowRequest,cancelFollowRequest};
