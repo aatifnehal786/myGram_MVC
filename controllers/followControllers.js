@@ -15,7 +15,7 @@ const followUser = async (req, res) => {
 
 // Unfollow
 // Unfollow user
-export const unfollowUser = async (req, res) => {
+const unfollowUser = async (req, res) => {
   try {
     const currentUserId = req.user._id;
     const { targetUserId } = req.params;
