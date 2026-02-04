@@ -2,29 +2,107 @@ import User from '../models/userModel.js'
 
 // Follow
 const followUser = async (req, res) => {
-  const currentUserId = req.user._id;
-  const { targetUserId } = req.params;
+  try {
+    const currentUserId = req.user._id;
+    const { targetUserId } = req.params;
 
-  if (!targetUserId) return res.status(400).json({ error: "Missing userId" });
+    if (!targetUserId) {
+      return res.status(400).json({ error: "Target user id is required" });
+    }
 
-  await User.findByIdAndUpdate(currentUserId, { $addToSet: { following: targetUserId } });
-  await User.findByIdAndUpdate(targetUserId, { $addToSet: { followers: currentUserId } });
+    if (currentUserId.toString() === targetUserId) {
+      return res.status(400).json({ error: "You cannot follow yourself" });
+    }
 
-  res.json({ message: "Followed" });
+    const targetUser = await User.findById(targetUserId);
+    const currentUser = await User.findById(currentUserId);
+
+    if (!targetUser || !currentUser) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // ❌ Already following
+    if (currentUser.following.includes(targetUserId)) {
+      return res.status(400).json({ error: "Already following" });
+    }
+
+    // 🔐 PRIVATE ACCOUNT → request required
+    if (targetUser.isPrivate) {
+      return res.status(403).json({
+        error: "This account is private. Send follow request instead.",
+        status: "requested",
+      });
+    }
+
+    // ✅ FOLLOW (public account)
+    await User.findByIdAndUpdate(currentUserId, {
+      $addToSet: { following: targetUserId },
+      $pull: { followRequestsSent: targetUserId },
+    });
+
+    await User.findByIdAndUpdate(targetUserId, {
+      $addToSet: { followers: currentUserId },
+      $pull: { followRequestsReceived: currentUserId },
+    });
+
+    return res.status(200).json({
+      message: "Followed successfully",
+      status: "following",
+    });
+  } catch (error) {
+    console.error("Follow user error:", error);
+    res.status(500).json({ error: "Server error while following" });
+  }
 };
+
 
 // Unfollow
+// Unfollow user
 const unfollowUser = async (req, res) => {
-  const currentUserId = req.user._id;
-  const { targetUserId } = req.params;
+  try {
+    const currentUserId = req.user._id;
+    const { targetUserId } = req.params;
 
-  if (!targetUserId) return res.status(400).json({ error: "Missing userId" });
+    if (!targetUserId) {
+      return res.status(400).json({ error: "Target user id is required" });
+    }
 
-  await User.findByIdAndUpdate(currentUserId, { $pull: { following: targetUserId } });
-  await User.findByIdAndUpdate(targetUserId, { $pull: { followers: currentUserId } });
+    if (currentUserId.toString() === targetUserId) {
+      return res.status(400).json({ error: "You cannot unfollow yourself" });
+    }
 
-  res.json({ message: "Unfollowed" });
+    const targetUser = await User.findById(targetUserId);
+    const currentUser = await User.findById(currentUserId);
+
+    if (!targetUser || !currentUser) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // 🔴 Remove from following & followers
+    await User.findByIdAndUpdate(currentUserId, {
+      $pull: {
+        following: targetUserId,
+        followRequestsSent: targetUserId, // safety cleanup
+      },
+    });
+
+    await User.findByIdAndUpdate(targetUserId, {
+      $pull: {
+        followers: currentUserId,
+        followRequestsReceived: currentUserId, // safety cleanup
+      },
+    });
+
+    return res.status(200).json({
+      message: "Unfollowed successfully",
+      status: "follow",
+    });
+  } catch (error) {
+    console.error("Unfollow error:", error);
+    res.status(500).json({ error: "Server error while unfollowing" });
+  }
 };
+
 
 // Follow status
 const followStatus = async (req, res) => {
