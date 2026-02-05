@@ -1,5 +1,13 @@
 import mongoose from "mongoose";
 
+
+const reactionSchema = new mongoose.Schema(
+  {
+    user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    emoji: { type: String },
+  },
+  { _id: false }
+);
 const MessageSchema = new mongoose.Schema(
   {
     sender: { type: mongoose.Schema.Types.ObjectId, ref: 'users', required: true },
@@ -23,7 +31,8 @@ const MessageSchema = new mongoose.Schema(
     seenAt: { type: Date, default: null },
     createdAt: { type: Date, default: Date.now},
     lastSeen: { type: Date },
-    isOnline: {type:Boolean, default:false}
+    isOnline: {type:Boolean, default:false},
+    reactions: [reactionSchema],
 
 
   },

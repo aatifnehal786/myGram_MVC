@@ -156,6 +156,51 @@ function socketHandler(server) {
      // Handle video call events
         handleVideoCallEvents(socket, io, onlineUsers)
 
+
+    // Handle Reactions
+     socket.on("react-message", async ({ messageId, emoji, userId }) => {
+    try {
+      const message = await Message.findById(messageId);
+      if (!message) return;
+
+      const existing = message.reactions.find(
+        (r) =>
+          r.user.toString() === userId &&
+          r.emoji === emoji
+      );
+
+      if (existing) {
+        // ❌ Remove reaction
+        message.reactions = message.reactions.filter(
+          (r) =>
+            !(
+              r.user.toString() === userId &&
+              r.emoji === emoji
+            )
+        );
+      } else {
+        // ✅ Add reaction
+        message.reactions.push({ user: userId, emoji });
+      }
+
+      await message.save();
+
+      // 🔥 Emit to BOTH users
+      io.to(message.sender.toString()).emit("message-reaction", {
+        messageId,
+        reactions: message.reactions,
+      });
+
+      io.to(message.receiver.toString()).emit("message-reaction", {
+        messageId,
+        reactions: message.reactions,
+      });
+
+    } catch (err) {
+      console.error("Reaction socket error:", err);
+    }
+  });
+
     /* =========================
        DISCONNECT
     ========================== */
