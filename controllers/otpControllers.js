@@ -52,7 +52,9 @@ export const sendEmailOtp = async (req, res) => {
 
   const otp = crypto.randomInt(100000, 999999).toString();
   otpStorage[email] = { otp, expiresAt: Date.now() + 10 * 60 * 1000 };
-
+  const user = await User.findOne({ email });
+  if (!user) return res.status(404).json({ error: "User not found" });
+  if(user.isEmailVerified) return res.status(400).json({ error: "Email already verified" });
   try {
    await sendOtpEmail(email,otp)
 
@@ -72,6 +74,8 @@ export const verifyEmailOtp = async (req, res) => {
   if (!storedData || storedData.otp !== otp || storedData.expiresAt < Date.now()) {
     return res.status(400).json({ error: "Invalid or expired OTP" });
   }
+
+  
 
   try {
     await User.updateOne({ email }, { isEmailVerified: true });
