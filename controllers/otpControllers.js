@@ -54,7 +54,7 @@ export const sendEmailOtp = async (req, res) => {
   otpStorage[email] = { otp, expiresAt: Date.now() + 10 * 60 * 1000 };
   const user = await User.findOne({ email });
   if (!user) return res.status(404).json({ error: "User not found" });
-  if(user.isEmailVerified) return res.status(400).json({ error: "Email already verified" });
+  if(user.isEmailVerified) return res.status(400).json({ message: "Email is already verified" });
   try {
    await sendOtpEmail(email,otp)
 
