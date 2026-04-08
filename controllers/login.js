@@ -3,30 +3,51 @@ import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import User from "../models/userModel.js";
 import { sendOtpEmail } from "../utils/sendMail.js";
-
 import OTP from "../models/otpModels.js";
-
 
 export const login = async (req, res) => {
   const { loginId, password, deviceId } = req.body;
   const ipAddress = req.ip;
 
   try {
-    const user = await User.findOne({
-      $or: [{ email: loginId }, { username: loginId }, { mobile: loginId }],
-    });
-    if (!user) return res.status(404).json({ message: "User not found" });
-    if (!user.isEmailVerified)
-      return res.status(403).json({ message: "Email not verified" });
+    // ❗ DeviceId must exist
+    if (!deviceId) {
+      return res.status(400).json({ message: "Device ID is required" });
+    }
 
+    // 🔍 Find user
+    const user = await User.findOne({
+      $or: [
+        { email: loginId.toLowerCase() },
+        { username: loginId },
+        { mobile: loginId },
+      ],
+    });
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (!user.isEmailVerified) {
+      return res.status(403).json({ message: "Email not verified" });
+    }
+
+    // 🔐 Check password
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(401).json({ message: "Incorrect password" });
+    if (!isMatch) {
+      return res.status(401).json({ message: "Incorrect password" });
+    }
 
     const ua = req.useragent;
 
-    const existingDevice = user.devices.find(d => d.deviceId === deviceId);
+    // 🔍 Check device
+    let existingDevice = user.devices.find(d => d.deviceId === deviceId);
 
+    // ✅ CASE 1: Known & Authorized Device → Direct Login
     if (existingDevice && existingDevice.authorized) {
+      existingDevice.lastUsed = new Date(); // update last used
+      await user.save();
+
       const token = jwt.sign(
         { email: user.email, id: user._id },
         process.env.JWT_SECRET_KEY,
@@ -41,42 +62,50 @@ export const login = async (req, res) => {
       });
     }
 
-    // ⚠️ New device or unauthorized device → send OTP
+    // ⚠️ CASE 2: New or Unauthorized Device → OTP flow
+
     const otp = crypto.randomInt(100000, 999999).toString();
 
-    // Remove old OTP if exists
+    // Remove old OTPs
     await OTP.deleteMany({ email: user.email.toLowerCase() });
 
-    // Save OTP in DB
-    const otpDoc = await OTP.create({
+    // Save OTP
+    await OTP.create({
       email: user.email.toLowerCase(),
       otp,
-      expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 min expiry
+      expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 min
     });
 
+    // Send OTP
     await sendOtpEmail(user.email, otp);
 
-    // Add device if not exists
+    // ➕ Add new device if not exists
     if (!existingDevice) {
       user.devices.push({
         deviceId,
         ip: ipAddress,
-        userAgent: ua.source,
+        userAgent: ua?.source || "unknown",
         authorized: false,
         addedAt: new Date(),
         lastUsed: new Date(),
       });
-      await user.save();
+    } else {
+      // Device exists but not authorized → update info
+      existingDevice.ip = ipAddress;
+      existingDevice.userAgent = ua?.source || "unknown";
+      existingDevice.lastUsed = new Date();
     }
 
-    res.status(200).json({
+    await user.save();
+
+    return res.status(200).json({
       otpRequired: true,
-      message: "New device detected. OTP sent to email.",
+      message: "New or untrusted device. OTP sent to email.",
       email: user.email,
     });
+
   } catch (err) {
     console.error("Login error:", err);
-    res.status(500).json({ message: "Server error" });
+    return res.status(500).json({ message: "Server error" });
   }
 };
-
