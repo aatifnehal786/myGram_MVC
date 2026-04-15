@@ -58,6 +58,10 @@ function socketHandler(server) {
       socket.chattingWith = null;
     });
 
+    // =========================== delete message for me =========================
+    /* =========================
+ 
+
 
     /* =========================
        SEND MESSAGE

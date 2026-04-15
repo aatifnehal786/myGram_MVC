@@ -144,8 +144,12 @@ const getChatList = async (req, res) => {
     const userId = req.user.id;
 
     const messages = await Message.find({
-      $or: [{ sender: userId }, { receiver: userId }],
-    }).populate("sender receiver", "name username profilePic");
+  $or: [{ sender: userId }, { receiver: userId }],
+})
+  .populate("sender receiver", "name username profilePic")
+  .select(
+    "sender receiver message fileUrl fileType isForwarded isDelivered isSeen createdAt isDeleted deletedFor reactions"
+  );
 
     const uniqueUsers = new Map();
     messages.forEach((msg) => {
@@ -180,7 +184,91 @@ const forwardMessage = async (req, res) => {
     res.status(500).json({ error: "Failed to forward message" });
   }
 };
+const deleteForMe = async (req, res) => {
+  const { messageId } = req.params;
+  const userId = req.user?.id;
 
+  console.log("Deleting for user:", userId);
+
+  try {
+    const message = await Message.findById(messageId);
+
+    if (!message) {
+      return res.status(404).json({ error: "Message not found" });
+    }
+
+    console.log("Before:", message.deletedFor);
+
+    // ✅ FORCE update using MongoDB (no mutation issues)
+    await Message.updateOne(
+      { _id: messageId },
+      {
+        $addToSet: { deletedFor: userId } // 🔥 BEST WAY
+      }
+    );
+
+    const updated = await Message.findById(messageId);
+    console.log("After:", updated.deletedFor);
+
+    // 🔥 socket emit
+    const sockets = global.onlineUsers.get(userId);
+    if (sockets) {
+      sockets.forEach((sockId) => {
+        req.app.get("io").to(sockId).emit("messageDeletedForMe", { messageId });
+      });
+    }
+
+    res.json({ message: "Deleted for me" });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Error deleting message" });
+  }
+};
+const deleteForEveryone = async (req, res) => {
+  const { messageId } = req.params;
+  const userId = req.user.id;
+
+  try {
+    const message = await Message.findById(messageId);
+    if (!message) {
+      return res.status(404).json({ error: "Message not found" });
+    }
+
+    // 🔐 Only sender can delete
+    if (message.sender.toString() !== userId) {
+      return res.status(403).json({
+        error: "You can only delete your own messages",
+      });
+    }
+
+    // ✅ Mark as deleted
+    message.isDeleted = true;
+    await message.save();
+
+    // 🔥 SOCKET EMIT TO BOTH USERS
+    const senderId = message.sender.toString();
+    const receiverId = message.receiver.toString();
+
+    const sendToSockets = (userId, event, payload) => {
+      const sockets = global.onlineUsers.get(userId);
+      if (sockets) {
+        sockets.forEach((sockId) => {
+          req.app.get("io").to(sockId).emit(event, payload);
+        });
+      }
+    };
+
+    sendToSockets(senderId, "messageDeleted", { messageId });
+    sendToSockets(receiverId, "messageDeleted", { messageId });
+
+    res.json({ message: "Message deleted for everyone" });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to delete message" });
+  }
+};
 
 // Export all functions as named exports
 export {
@@ -189,5 +277,8 @@ export {
   getChat,
   searchUsers,
   getChatList,
-  forwardMessage
+  forwardMessage,
+  deleteForMe,
+  deleteForEveryone
 };
+

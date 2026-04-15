@@ -1,6 +1,8 @@
+
+import dns from 'node:dns/promises'
+dns.setServers(["8.8.8.8","1.1.1.1"])
 import dotenv from "dotenv";
 dotenv.config();
-
 import express from "express";
 import cors from 'cors'
 import connectDB from "./config/db.js";
@@ -40,6 +42,10 @@ app.use(cors({
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
 }));
 
+const io = socketHandler(server);
+
+// ✅ Now it's defined
+app.set("io", io);
 
 // auth Routes
 app.use("/api/auth", authRoutes);

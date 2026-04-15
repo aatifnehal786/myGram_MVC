@@ -7,6 +7,8 @@ import {
   searchUsers, 
   getChatList, 
   forwardMessage, 
+  deleteForMe,
+  deleteForEveryone
  
 } from '../controllers/chatController.js';
 
@@ -22,6 +24,8 @@ router.get("/chat/:userId", auth, getChat);
 router.get("/search-users",auth, (req, res) => searchUsers(req, res, global.onlineUsers));
 router.get("/chat-list", auth, getChatList);
 router.post("/chat/forward", auth, forwardMessage);
+router.delete("/chat/deleteForMe/:messageId", auth, deleteForMe);
+router.delete("/chat/deleteForEveryone/:messageId", auth, deleteForEveryone);
 
 
 
