@@ -27,6 +27,11 @@ const app = express();
 const server = http.createServer(app);
 app.use(express.json());
 app.use(useragent.express());
+app.use(cors({
+  origin: ["https://mygram247.netlify.app", "http://localhost:5173"],
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+}));
 
 
 app.use(express.json({ limit: "50mb" }));
@@ -36,11 +41,7 @@ app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 socketHandler(server);
 // Handling Cors
 
-app.use(cors({
-  origin: ["https://mygram247.netlify.app", "http://localhost:5173"],
-  credentials: true,
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-}));
+
 
 const io = socketHandler(server);
 
