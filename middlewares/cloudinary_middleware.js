@@ -31,21 +31,71 @@ const uploadProfilePic = multer({ storage: profilePicStorage });
 //   api_secret: process.env.CLOUDINARY_API_SECRET,
 // });
 
+// ============================
+// multer.js
+// ============================
+
+
+
 const storage = new CloudinaryStorage({
   cloudinary,
+
   params: async (req, file) => {
-    const ext = path.extname(file.originalname).toLowerCase();
     let folder = "posts";
 
-    if (file.fieldname === "backgroundMusic") folder = "music";
+    if (file.fieldname === "backgroundMusic") {
+      folder = "music";
+    }
 
     return {
       folder,
-      resource_type: "auto", // auto-detect image, video, audio
-      public_id: `${Date.now()}-${file.originalname.split(".")[0]}`,
+      resource_type: "auto",
+
+      public_id: `${Date.now()}-${path
+        .parse(file.originalname)
+        .name.replace(/\s+/g, "-")}`,
     };
   },
 });
+
+const fileFilter = (req, file, cb) => {
+  const allowedMimeTypes = [
+    // images
+    "image/png",
+    "image/jpeg",
+    "image/jpg",
+    "image/webp",
+
+    // videos
+    "video/mp4",
+    "video/webm",
+    "video/quicktime",
+    "video/x-matroska",
+
+    // audio
+    "audio/mpeg",
+    "audio/mp3",
+    "audio/wav",
+  ];
+
+  if (allowedMimeTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error("Unsupported file type"), false);
+  }
+};
+
+const upload = multer({
+  storage,
+
+  fileFilter,
+
+  limits: {
+    fileSize: 1024 * 1024 * 100, // 100MB
+  },
+});
+
+
 
 
 
