@@ -12,11 +12,14 @@ const router = express.Router();
  */
 router.post(
   "/create",
-  auth,
+  auth, // Ensure the user is authenticated before allowing post creation
+  
+
   upload.fields([
-    { name: "image", maxCount: 1 },
+    { name: "media", maxCount: 1 },
     { name: "backgroundMusic", maxCount: 1 },
   ]),
+
   createPost
 );
 
