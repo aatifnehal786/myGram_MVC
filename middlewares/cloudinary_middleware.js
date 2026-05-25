@@ -103,7 +103,6 @@ const upload = multer({
 
 
 
-const upload = multer({ storage });
 
 export { uploadProfilePic, upload };
 
