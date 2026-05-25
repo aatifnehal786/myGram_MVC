@@ -38,7 +38,7 @@ const uploadProfilePic = multer({ storage: profilePicStorage });
 
 
 const storage = new CloudinaryStorage({
-  cloudinary,
+  cloudinary:cloudinary,
 
   params: async (req, file) => {
     let folder = "posts";
@@ -86,7 +86,7 @@ const fileFilter = (req, file, cb) => {
 };
 
 const upload = multer({
-  storage,
+  storage: storage,
 
   fileFilter,
 
