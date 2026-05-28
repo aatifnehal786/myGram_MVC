@@ -12,33 +12,11 @@ const router = express.Router();
  */
 
 
-router.post(
-  "/create",
-
-  auth,
-
-  (req, res, next) => {
-    upload.fields([
-      { name: "media", maxCount: 1 },
-      { name: "backgroundMusic", maxCount: 1 },
-    ])(req, res, (err) => {
-
-      // MULTER/CLOUDINARY ERROR
-      if (err) {
-        console.error("UPLOAD ERROR:", err);
-
-        return res.status(400).json({
-          success: false,
-
-          error:
-            err.message ||
-            "Upload failed",
-        });
-      }
-
-      next();
-    });
-  },
+router.post("/create",auth,upload.fields([{ name: "media", maxCount: 1 },
+                                        { name: "backgroundMusic", maxCount: 1 },
+    ]),
+  
+  
 
   createPost
 );

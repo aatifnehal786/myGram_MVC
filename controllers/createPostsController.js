@@ -22,8 +22,12 @@ export const createPost = async (req, res) => {
 
     const mediaUrl = mediaFile.path;
 
-    const musicUrl =
-      req.files.backgroundMusic?.[0]?.path || null;
+   const musicFile = req.files.backgroundMusic?.[0];
+
+const musicUrl =
+  musicFile?.path ||
+  musicFile?.secure_url ||
+  null;
 
     const post = await Post.create({
       caption,
@@ -39,6 +43,8 @@ export const createPost = async (req, res) => {
 
       postedBy: req.user.id,
     });
+
+    console.log(req.files);
 
     return res.status(201).json({
       success: true,
