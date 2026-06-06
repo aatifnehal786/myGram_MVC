@@ -2,6 +2,31 @@ import { Server } from "socket.io";
 import User from "../models/userModel.js";
 import Message from "../models/messageModel.js";
 import handleVideoCallEvents from "../utils/video-call-events.js";
+
+import Conversation from "../models/coversationModal.js";
+
+const findOrCreateConversation = async (
+  senderId,
+  receiverId
+) => {
+  let conversation = await Conversation.findOne({
+    participants: {
+      $all: [senderId, receiverId],
+    },
+  });
+
+  if (!conversation) {
+    conversation = await Conversation.create({
+      participants: [senderId, receiverId],
+      unreadCounts: {
+        [senderId]: 0,
+        [receiverId]: 0,
+      },
+    });
+  }
+
+  return conversation;
+};
 function socketHandler(server) {
   const io = new Server(server, {
     cors: {
@@ -66,6 +91,8 @@ function socketHandler(server) {
     /* =========================
        SEND MESSAGE
     ========================== */
+
+
     socket.on(
       "sendMessage",
       async ({ senderId, receiverId, message,fileType,fileUrl,isForwarded  }) => {
@@ -81,6 +108,39 @@ function socketHandler(server) {
             isSeen: false,
           });
 
+          const conversation = await findOrCreateConversation(
+            senderId,
+            receiverId
+          );
+
+          const receiverSockets = global.onlineUsers.get(receiverId);
+
+          let chatOpen = false;
+
+          if (receiverSockets) {
+            receiverSockets.forEach((sockId) => {
+              const sock = io.sockets.sockets.get(sockId);
+
+              if (sock?.chattingWith === senderId) {
+                chatOpen = true;
+              }
+            });
+          }
+
+          if (!chatOpen) {
+            const currentUnread =
+              conversation.unreadCounts.get(receiverId) || 0;
+
+            conversation.unreadCounts.set(
+              receiverId,
+              currentUnread + 1
+            );
+          }
+
+          conversation.lastMessage = newMessage._id;
+
+          await conversation.save();
+
           const sendToSockets = (userId, event, payload) => {
             const sockets = global.onlineUsers.get(userId);
             if (sockets) {
@@ -89,13 +149,21 @@ function socketHandler(server) {
               });
             }
           };
-
+          sendToSockets(receiverId, "unreadCountUpdated", {
+            senderId,
+            unreadCount:
+              conversation.unreadCounts.get(receiverId) || 0,
+          });
           // Send message to sender & receiver
           sendToSockets(senderId, "receiveMessage", newMessage);
-          sendToSockets(receiverId, "receiveMessage", newMessage);
+          sendToSockets(receiverId, "receiveMessage", {
+            ...newMessage.toObject(),
+            unreadCount:
+              conversation.unreadCounts.get(receiverId),
+          });
 
           // 🔔 Send notification ONLY if chat not open
-          const receiverSockets = global.onlineUsers.get(receiverId);
+          // const receiverSockets = global.onlineUsers.get(receiverId);
 
           if (receiverSockets) {
             receiverSockets.forEach((sockId) => {
@@ -122,19 +190,58 @@ function socketHandler(server) {
     /* =========================
        MARK MESSAGES AS SEEN
     ========================== */
-    socket.on("markSeen", async ({ userId, otherUserId }) => {
-      await Message.updateMany(
-        { sender: otherUserId, receiver: userId, isSeen: false },
-        { isSeen: true, seenAt: new Date() }
-      );
+   socket.on("markSeen", async ({ userId, otherUserId }) => {
+  await Message.updateMany(
+    {
+      sender: otherUserId,
+      receiver: userId,
+      isSeen: false,
+    },
+    {
+      isSeen: true,
+      seenAt: new Date(),
+    }
+  );
 
-      const senderSockets = global.onlineUsers.get(otherUserId);
-      if (senderSockets) {
-        senderSockets.forEach((sockId) => {
-          io.to(sockId).emit("messagesSeen", { userId });
-        });
-      }
+  const conversation =
+    await Conversation.findOne({
+      participants: {
+        $all: [userId, otherUserId],
+      },
     });
+
+  if (conversation) {
+    conversation.unreadCounts.set(userId, 0);
+
+    await conversation.save();
+  }
+
+  const userSockets =
+    global.onlineUsers.get(userId);
+
+  if (userSockets) {
+    userSockets.forEach((sockId) => {
+      io.to(sockId).emit(
+        "unreadCountUpdated",
+        {
+          senderId: otherUserId,
+          unreadCount: 0,
+        }
+      );
+    });
+  }
+
+  const senderSockets =
+    global.onlineUsers.get(otherUserId);
+
+  if (senderSockets) {
+    senderSockets.forEach((sockId) => {
+      io.to(sockId).emit("messagesSeen", {
+        userId,
+      });
+    });
+  }
+});
 
     /* =========================
        TYPING INDICATOR
@@ -190,20 +297,28 @@ function socketHandler(server) {
       await message.save();
 
       // 🔥 Emit to BOTH users
-      io.to(message.sender.toString()).emit("message-reaction", {
-        messageId,
-        reactions: message.reactions,
-      });
+         sendToSockets(
+           message.sender.toString(),
+           "message-reaction",
+           {
+             messageId,
+             reactions: message.reactions,
+           }
+         );
 
-      io.to(message.receiver.toString()).emit("message-reaction", {
-        messageId,
-        reactions: message.reactions,
-      });
+         sendToSockets(
+           message.receiver.toString(),
+           "message-reaction",
+           {
+             messageId,
+             reactions: message.reactions,
+           }
+         );
 
-    } catch (err) {
-      console.error("Reaction socket error:", err);
-    }
-  });
+       } catch (err) {
+         console.error("Reaction socket error:", err);
+       }
+     });
 
     /* =========================
        DISCONNECT

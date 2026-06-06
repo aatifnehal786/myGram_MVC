@@ -1,5 +1,5 @@
 import User from "../models/userModel.js";
-
+import Conversation from "../models/coversationModal.js";
 /* ===========================
    FOLLOW USER
 =========================== */
@@ -117,16 +117,59 @@ const getFollowers = async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
+    const conversations = await Conversation.find({
+  participants: req.params.userId,
+});
+conversations.forEach((conv) => {
+  console.log("Conversation:", conv);
+
+  const otherUserId = conv.participants.find(
+    (id) => id.toString() !== req.params.userId
+  );
+});
+const conversationMap = {};
+
+conversations.forEach((conv) => {
+  const otherUserId = conv.participants.find(
+    (id) => id.toString() !== req.params.userId
+  );
+
+  if (otherUserId) {
+    conversationMap[otherUserId.toString()] = {
+      conversationId: conv._id,
+      unreadCount:
+        conv.unreadCounts.get(req.params.userId) || 0,
+      lastMessage: conv.lastMessage,
+    };
+  }
+});
 
     const onlineUserIds = Array.from(global.onlineUsers?.keys() || []);
 
-    const followersWithOnlineStatus = user.followers.map((f) => ({
-      _id: f._id,
-      username: f.username,
-      profilePic: f.profilePic,
-      lastSeen: f.lastSeen,
-      isOnline: onlineUserIds.includes(f._id.toString()),
-    }));
+   const followersWithOnlineStatus = user.followers.map((f) => {
+  const conversation =
+    conversationMap[f._id.toString()] || {};
+
+  return {
+    _id: f._id,
+    username: f.username,
+    profilePic: f.profilePic,
+    lastSeen: f.lastSeen,
+
+    isOnline: onlineUserIds.includes(
+      f._id.toString()
+    ),
+
+    conversationId:
+      conversation.conversationId || null,
+
+    unreadCount:
+      conversation.unreadCount || 0,
+
+    lastMessage:
+      conversation.lastMessage || null,
+  };
+});
 
     res.json({ followers: followersWithOnlineStatus });
   } catch (error) {

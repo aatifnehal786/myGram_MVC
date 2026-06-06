@@ -71,6 +71,7 @@ const deleteChatMessages = async (req, res) => {
   }
 };
 
+
 // Get chat between two users
 // Get chat between two users (paginated)
 const getChat = async (req, res) => {
