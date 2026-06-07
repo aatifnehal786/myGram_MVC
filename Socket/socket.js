@@ -114,6 +114,8 @@ function socketHandler(server) {
           );
 
           const receiverSockets = global.onlineUsers.get(receiverId);
+           const senderUser = await User.findById(senderId)
+                .select("username profilePic");
 
           let chatOpen = false;
 
@@ -172,9 +174,12 @@ function socketHandler(server) {
 
               // 🚫 Suppress ONLY if chat is actively open
               if (sock.chattingWith === senderId) return;
+             
 
               io.to(sockId).emit("newNotification", {
                 senderId,
+                senderName: senderUser.username,
+                senderProfilePic: senderUser.profilePic,
                 text: message || "New message",
                 messageId: newMessage._id,
               });

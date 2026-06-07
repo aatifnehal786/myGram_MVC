@@ -118,58 +118,63 @@ const getFollowers = async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
     const conversations = await Conversation.find({
-  participants: req.params.userId,
-});
-conversations.forEach((conv) => {
-  console.log("Conversation:", conv);
+      participants: req.params.userId,
+    }).populate("lastMessage");
 
-  const otherUserId = conv.participants.find(
-    (id) => id.toString() !== req.params.userId
-  );
-});
-const conversationMap = {};
+    const conversationMap = {};
 
-conversations.forEach((conv) => {
-  const otherUserId = conv.participants.find(
-    (id) => id.toString() !== req.params.userId
-  );
+    conversations.forEach((conv) => {
+      const otherUserId = conv.participants.find(
+        (id) => id.toString() !== req.params.userId
+      );
 
-  if (otherUserId) {
-    conversationMap[otherUserId.toString()] = {
-      conversationId: conv._id,
-      unreadCount:
-        conv.unreadCounts.get(req.params.userId) || 0,
-      lastMessage: conv.lastMessage,
-    };
-  }
-});
+      if (otherUserId) {
+        conversationMap[otherUserId.toString()] = {
+          conversationId: conv._id,
+          unreadCount:
+            conv.unreadCounts.get(req.params.userId) || 0,
+          lastMessage: conv.lastMessage,
+        };
+      }
+    });
 
     const onlineUserIds = Array.from(global.onlineUsers?.keys() || []);
 
-   const followersWithOnlineStatus = user.followers.map((f) => {
-  const conversation =
-    conversationMap[f._id.toString()] || {};
+    const followersWithOnlineStatus = user.followers.map((f) => {
+      const conversation =
+        conversationMap[f._id.toString()] || {};
 
-  return {
-    _id: f._id,
-    username: f.username,
-    profilePic: f.profilePic,
-    lastSeen: f.lastSeen,
+      return {
+        _id: f._id,
+        username: f.username,
+        profilePic: f.profilePic,
+        lastSeen: f.lastSeen,
 
-    isOnline: onlineUserIds.includes(
-      f._id.toString()
-    ),
+        isOnline: onlineUserIds.includes(
+          f._id.toString()
+        ),
 
-    conversationId:
-      conversation.conversationId || null,
+        conversationId:
+          conversation.conversationId || null,
 
-    unreadCount:
-      conversation.unreadCount || 0,
+        unreadCount:
+          conversation.unreadCount || 0,
 
-    lastMessage:
-      conversation.lastMessage || null,
-  };
-});
+        lastMessage:
+          conversation.lastMessage || null,
+      };
+    });
+
+    followersWithOnlineStatus.sort((a, b) => {
+      if (!a.lastMessage && !b.lastMessage) return 0;
+      if (!a.lastMessage) return 1;
+      if (!b.lastMessage) return -1;
+
+      return (
+        new Date(b.lastMessage.createdAt) -
+        new Date(a.lastMessage.createdAt)
+      );
+    });
 
     res.json({ followers: followersWithOnlineStatus });
   } catch (error) {
