@@ -1,6 +1,6 @@
 // Fixed server-side events with proper userId handling
 
-export const handleVideoCallEvents = (socket, io, onlineUsers) => {
+const handleVideoCallEvents = (socket, io, onlineUsers) => {
   // Initiate video call
   socket.on("initiate_call", ({ callerId, receiverId, callType, callerInfo }) => {
     console.log(` SERVER: Call initiated from ${callerId} to ${receiverId}`)
@@ -111,3 +111,4 @@ export const handleVideoCallEvents = (socket, io, onlineUsers) => {
 }
 
 
+export default handleVideoCallEvents;
