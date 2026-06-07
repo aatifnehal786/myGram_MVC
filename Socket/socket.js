@@ -29,15 +29,19 @@ const findOrCreateConversation = async (
 };
 function socketHandler(server) {
   const io = new Server(server, {
-    cors: {
-      origin: [
-        "http://localhost:5173",
-        "https://mygram247.netlify.app"
-      ],
-      methods: ["GET", "POST", "PUT", "DELETE"],
-      credentials: true,
-    },
-  });
+  cors: {
+    origin: [
+      "http://localhost:5173",
+      "https://mygram247.netlify.app",
+    ],
+    methods: ["GET", "POST"],
+    credentials: true,
+  },
+
+  // 🔥 IMPORTANT FIX FOR RENDER
+  transports: ["polling", "websocket"],
+  allowEIO3: true,
+});
 
   // userId -> Set(socketId)
   global.onlineUsers = new Map();
@@ -270,7 +274,7 @@ function socketHandler(server) {
     });
 
      // Handle video call events
-        handleVideoCallEvents(socket, io, onlineUsers)
+        handleVideoCallEvents(socket, io, global.onlineUsers)
 
 
     // Handle Reactions
