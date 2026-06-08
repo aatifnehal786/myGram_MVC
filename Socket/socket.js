@@ -364,6 +364,8 @@ function socketHandler(server) {
 })
 })
 
+return io;
+
 }
 
 export default socketHandler;
