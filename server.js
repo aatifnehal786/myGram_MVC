@@ -50,6 +50,8 @@ const io = socketHandler(server);
 // ✅ Now it's defined
 app.set("io", io);
 
+app.set("trust proxy", 1);
+
 // auth Routes
 app.use("/api/auth", authRoutes);
 app.use("/api", deviceRoutes);
