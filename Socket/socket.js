@@ -39,7 +39,7 @@ function socketHandler(server) {
   },
 
   // 🔥 IMPORTANT FIX FOR RENDER
-  transports: ["websocket"],
+  transports: ["websocket", "polling"],
   allowEIO3: true,
 });
 

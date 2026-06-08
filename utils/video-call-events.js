@@ -58,15 +58,19 @@ const handleVideoCallEvents = (socket, io, onlineUsers) => {
 
   // Offer
   socket.on(
-    "webrtc_offer",
-    ({ receiverId, offer, callId }) => {
-      emitToUser(receiverId, "webrtc_offer", {
-        offer,
-        senderId: socket.userId,
-        callId,
-      });
-    }
-  );
+  "webrtc_offer",
+  ({ receiverId, offer, callId }) => {
+
+    console.log("socket.userId =", socket.userId);
+    console.log("receiverId =", receiverId);
+
+    emitToUser(receiverId, "webrtc_offer", {
+      offer,
+      senderId: socket.userId,
+      callId,
+    });
+  }
+);
 
   // Answer
   socket.on(
