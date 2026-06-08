@@ -5,6 +5,16 @@ const handleVideoCallEvents = (socket, io, onlineUsers) => {
 
     if (!sockets) return;
 
+      console.log(
+    "EMIT:",
+    event,
+    "TO:",
+    userId,
+    "SOCKETS:",
+    sockets
+  );
+
+
     sockets.forEach((socketId) => {
       io.to(socketId).emit(event, data);
     });
@@ -74,27 +84,35 @@ const handleVideoCallEvents = (socket, io, onlineUsers) => {
 
   // Answer
   socket.on(
-    "webrtc_answer",
-    ({ receiverId, answer, callId }) => {
-      emitToUser(receiverId, "webrtc_answer", {
-        answer,
-        senderId: socket.userId,
-        callId,
-      });
-    }
-  );
+  "webrtc_answer",
+  ({ receiverId, answer, callId }) => {
+
+    console.log("socket.userId =", socket.userId);
+    console.log("receiverId =", receiverId);
+
+    emitToUser(receiverId, "webrtc_answer", {
+      answer,
+      senderId: socket.userId,
+      callId,
+    });
+  }
+);
 
   // ICE candidate
-  socket.on(
-    "webrtc_ice_candidate",
-    ({ receiverId, candidate, callId }) => {
-      emitToUser(receiverId, "webrtc_ice_candidate", {
-        candidate,
-        senderId: socket.userId,
-        callId,
-      });
-    }
-  );
+ socket.on(
+  "webrtc_ice_candidate",
+  ({ receiverId, candidate, callId }) => {
+
+    console.log("socket.userId =", socket.userId);
+    console.log("receiverId =", receiverId);
+
+    emitToUser(receiverId, "webrtc_ice_candidate", {
+      candidate,
+      senderId: socket.userId,
+      callId,
+    });
+  }
+);
 };
 
 export default handleVideoCallEvents;

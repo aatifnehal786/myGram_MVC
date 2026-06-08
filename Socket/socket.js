@@ -55,6 +55,10 @@ function socketHandler(server) {
     socket.on("join", async (userId) => {
       socket.userId = userId;
 
+      console.log("JOIN EVENT");
+      console.log("socket.id =", socket.id);
+      console.log("socket.userId =", socket.userId);
+
       if (!global.onlineUsers.has(userId)) {
         global.onlineUsers.set(userId, new Set());
       }
