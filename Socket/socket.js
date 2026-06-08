@@ -30,17 +30,15 @@ const findOrCreateConversation = async (
 function socketHandler(server) {
   const io = new Server(server, {
   cors: {
-    origin: [
-      "http://localhost:5173",
-      "https://mygram247.netlify.app",
+    origin: ["http://localhost:5173","https://mygram247.netlify.app",
     ],
-    methods: ["GET", "POST"],
     credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   },
 
   // 🔥 IMPORTANT FIX FOR RENDER
   transports: ["websocket", "polling"],
-  allowEIO3: true,
+  pingTimeout: 60000,
 });
 
   // userId -> Set(socketId)
