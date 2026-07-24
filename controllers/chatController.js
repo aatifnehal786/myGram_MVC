@@ -18,8 +18,7 @@ const upload = multer();
 
 // Chat file upload
 const uploadChatFile = [
-  upload.single("file"),
-  async (req, res) => {
+  upload.single("file"), async (req, res) => {
     try {
       const mimeType = req.file.mimetype;
 

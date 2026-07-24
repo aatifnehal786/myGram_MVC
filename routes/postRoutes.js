@@ -6,14 +6,15 @@ import {getAllPosts,
   commentPost,
   deletePost,
   getPublicPosts} from '../controllers/postController.js'
+import {blockGuest} from '../controllers/blockGuest.js';
 
 const router = express.Router();
 
 router.get("/allposts", auth, getAllPosts);
-router.put("/like/:postid", auth, likePost);
-router.put("/unlike/:postid", auth, unlikePost);
-router.post("/comment/:postid", auth, commentPost);
-router.delete("/delete-post/:id", auth, deletePost);
+router.put("/like/:postid", auth, blockGuest, likePost);
+router.put("/unlike/:postid", auth, blockGuest, unlikePost);
+router.post("/comment/:postid", auth, blockGuest, commentPost);
+router.delete("/delete-post/:id", auth, blockGuest, deletePost);
 router.get("/public-posts", getPublicPosts);
 
 export default router

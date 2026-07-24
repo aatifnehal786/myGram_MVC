@@ -2,7 +2,7 @@ import express from "express";
 import { createPost } from "../controllers/createPostsController.js";
 import auth from "../middlewares/auth.js";
 import { upload } from "../middlewares/cloudinary_middleware.js";  // ⬅ use your Cloudinary storage
-
+import {blockGuest} from "../controllers/blockGuest.js";
 const router = express.Router();
 
 /**
@@ -12,14 +12,7 @@ const router = express.Router();
  */
 
 
-router.post("/create",auth,upload.fields([{ name: "media", maxCount: 1 },
-                                        { name: "backgroundMusic", maxCount: 1 },
-    ]),
-  
-  
-
-  createPost
-);
+router.post("/create",auth,blockGuest,upload.fields([{ name: "media", maxCount: 1 },{ name: "backgroundMusic", maxCount: 1 },]),createPost);
 
 
 
