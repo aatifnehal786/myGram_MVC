@@ -128,3 +128,32 @@ export const updateUserProfile = async (req, res) => {
     });
   }
 };
+
+
+// GET ALL USERS STATS
+
+export const getAllUsersStats = async (req, res) => {
+  try {
+    const users = await User.find();
+    const userStats = [];
+
+    for (const user of users) {
+      const posts = await Post.find({ postedBy: user._id });
+      const postCount = posts.length;
+      const totalLikes = posts.reduce((acc, post) => acc + post.likes.length, 0);
+
+      userStats.push({
+        username: user.username,
+        followersCount: user.followers.length,
+        followingCount: user.following.length,
+        postsCount: postCount,
+        likesReceived: totalLikes,
+        profilePic: user.profilePic,
+      });
+    }
+
+    res.status(200).json(userStats);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
