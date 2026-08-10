@@ -54,11 +54,13 @@ export const login = async (req, res) => {
         { expiresIn: "7d" }
       );
 
-      return res.status(200).json({
-        token,
+      res.json({
         message: "Login successful",
+        token,
         userid: user._id,
         name: user.username,
+        profilePic: user.profilePic || user.profilePicture, // ADD THIS
+        profilePicture: user.profilePic || user.profilePicture,
       });
     }
 
