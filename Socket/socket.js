@@ -29,32 +29,25 @@ function socketHandler(server) {
 
   global.onlineUsers = new Map();
 
-  // Helper - GLOBAL, usable everywhere
-  const sendToSockets = (userId, event, payload) => {
-    const sockets = global.onlineUsers.get(userId);
-    if (sockets) {
-      sockets.forEach((sockId) => {
-        io.to(sockId).emit(event, payload);
-      });
-    }
-  };
-
   io.on("connection", (socket) => {
     console.log("New socket connected:", socket.id);
 
     socket.on("join", async (userId) => {
       socket.userId = userId;
+      socket.join(userId); // JOIN ROOM - critical fix
+
       if (!global.onlineUsers.has(userId)) {
         global.onlineUsers.set(userId, new Set());
       }
       global.onlineUsers.get(userId).add(socket.id);
+
       await User.findByIdAndUpdate(userId, { isOnline: true });
 
-      // FIX 1: Send full list to the user who just joined
-      socket.emit("online-users", Array.from(global.onlineUsers.keys()));
-      socket.emit("online-users-list", Array.from(global.onlineUsers.keys()));
-      
-      // FIX 2: Notify others
+      // Send full list to new user
+      io.to(userId).emit("online-users", Array.from(global.onlineUsers.keys()));
+      io.to(userId).emit("online-users-list", Array.from(global.onlineUsers.keys()));
+
+      // Notify others
       socket.broadcast.emit("user-online", { userId });
     });
 
@@ -90,10 +83,13 @@ function socketHandler(server) {
 
         let chatOpen = false;
         if (receiverSockets) {
-          receiverSockets.forEach((sockId) => {
+          for (const sockId of receiverSockets) {
             const sock = io.sockets.sockets.get(sockId);
-            if (sock?.chattingWith === senderId) chatOpen = true;
-          });
+            if (sock?.chattingWith === senderId) {
+              chatOpen = true;
+              break;
+            }
+          }
         }
 
         if (!chatOpen) {
@@ -103,21 +99,29 @@ function socketHandler(server) {
         conversation.lastMessage = newMessage._id;
         await conversation.save();
 
-        sendToSockets(receiverId, "unreadCountUpdated", {
+        // FIX FOR DUPLICATE:
+        // 1. Sender - emit only to this one socket, not to all his devices/tabs
+        socket.emit("receiveMessage", newMessage);
+
+        // 2. Sender's other tabs - sync them
+        socket.to(senderId).emit("receiveMessage", newMessage);
+
+        // 3. Receiver - send to his room (once, not per socket)
+        io.to(receiverId).emit("receiveMessage", {
+         ...newMessage.toObject(),
+          unreadCount: conversation.unreadCounts.get(receiverId) || 0,
+        });
+
+        io.to(receiverId).emit("unreadCountUpdated", {
           senderId,
           unreadCount: conversation.unreadCounts.get(receiverId) || 0,
         });
 
-        sendToSockets(senderId, "receiveMessage", newMessage);
-        sendToSockets(receiverId, "receiveMessage", {
-          ...newMessage.toObject(),
-          unreadCount: conversation.unreadCounts.get(receiverId),
-        });
-
+        // Notifications
         if (receiverSockets) {
-          receiverSockets.forEach((sockId) => {
+          for (const sockId of receiverSockets) {
             const sock = io.sockets.sockets.get(sockId);
-            if (!sock || sock.chattingWith === senderId) return;
+            if (!sock || sock.chattingWith === senderId) continue;
             io.to(sockId).emit("newNotification", {
               senderId,
               senderName: senderUser.username,
@@ -125,7 +129,7 @@ function socketHandler(server) {
               text: message || "New message",
               messageId: newMessage._id,
             });
-          });
+          }
         }
       } catch (err) {
         console.error("Send message error:", err);
@@ -139,16 +143,16 @@ function socketHandler(server) {
         conversation.unreadCounts.set(userId, 0);
         await conversation.save();
       }
-      sendToSockets(userId, "unreadCountUpdated", { senderId: otherUserId, unreadCount: 0 });
-      sendToSockets(otherUserId, "messagesSeen", { userId });
+      io.to(userId).emit("unreadCountUpdated", { senderId: otherUserId, unreadCount: 0 });
+      io.to(otherUserId).emit("messagesSeen", { userId });
     });
 
     socket.on("typing", ({ senderId, receiverId }) => {
-      sendToSockets(receiverId, "typing", senderId);
+      io.to(receiverId).emit("typing", senderId);
     });
 
     socket.on("stopTyping", ({ senderId, receiverId }) => {
-      sendToSockets(receiverId, "stopTyping", senderId);
+      io.to(receiverId).emit("stopTyping", senderId);
     });
 
     handleVideoCallEvents(socket, io, global.onlineUsers);
@@ -159,14 +163,13 @@ function socketHandler(server) {
         if (!message) return;
         const existing = message.reactions.find((r) => r.user.toString() === userId && r.emoji === emoji);
         if (existing) {
-          message.reactions = message.reactions.filter((r) => !(r.user.toString() === userId && r.emoji === emoji));
+          message.reactions = message.reactions.filter((r) =>!(r.user.toString() === userId && r.emoji === emoji));
         } else {
           message.reactions.push({ user: userId, emoji });
         }
         await message.save();
-        // Now sendToSockets works because it's global
-        sendToSockets(message.sender.toString(), "message-reaction", { messageId, reactions: message.reactions });
-        sendToSockets(message.receiver.toString(), "message-reaction", { messageId, reactions: message.reactions });
+        io.to(message.sender.toString()).emit("message-reaction", { messageId, reactions: message.reactions });
+        io.to(message.receiver.toString()).emit("message-reaction", { messageId, reactions: message.reactions });
       } catch (err) {
         console.error("Reaction socket error:", err);
       }
@@ -177,14 +180,16 @@ function socketHandler(server) {
       if (!userId) return;
       const socketSet = global.onlineUsers.get(userId);
       if (!socketSet) return;
+
       socketSet.delete(socket.id);
+      socket.leave(userId);
+
       if (socketSet.size === 0) {
         global.onlineUsers.delete(userId);
-        const lastSeen = new Date();
-        await User.findByIdAndUpdate(userId, { isOnline: false, lastSeen });
-        socket.broadcast.emit("user-offline", { userId, lastSeen });
-        io.emit("online-users-list", Array.from(global.onlineUsers.keys()));
+        await User.findByIdAndUpdate(userId, { isOnline: false, lastSeen: new Date() });
+        socket.broadcast.emit("user-offline", { userId, lastSeen: new Date() });
         io.emit("online-users", Array.from(global.onlineUsers.keys()));
+        io.emit("online-users-list", Array.from(global.onlineUsers.keys()));
       }
       console.log("Socket disconnected:", socket.id);
     });
