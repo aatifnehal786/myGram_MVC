@@ -183,9 +183,14 @@ const getFollowers = async (req, res) => {
   }
 };
 
-export {
-  followUser,
-  unfollowUser,
-  followStatus,
-  getFollowers,
+
+const getFollowing = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.userId).populate("following", "username profilePic");
+    res.json({ following: user.following || [] });
+  } catch (error) {
+    console.error("Get following error:", error);
+    res.status(500).json({ following: [] });
+  }
 };
+export { followUser, unfollowUser, followStatus, getFollowers, getFollowing }
