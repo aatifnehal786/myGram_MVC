@@ -56,7 +56,7 @@ app.set("trust proxy", 1);
 app.use("/api/auth", authRoutes);
 app.use("/api", deviceRoutes);
 app.use("/api/posts", postRoutes);
-app.use("/api/follow", followRoutes);
+app.use("/api", followRoutes);
 app.use("/api/uploads", uploadRoutes);
 app.use("/api/chats", chatRoutes);
 app.use("/api/password", passwordRoutes);
