@@ -178,6 +178,13 @@ const forwardMessage = async (req, res) => {
       isForwarded: isForwarded || false,
       createdAt: new Date(),
     });
+    const io = req.app.get("io");
+const sendTo = (userId, payload) => {
+  const sockets = global.onlineUsers.get(userId);
+  if (sockets) sockets.forEach(id => io.to(id).emit("receiveMessage", payload));
+};
+sendTo(receiverId, newMsg);
+sendTo(senderId, newMsg);
     res.json(newMsg);
   } catch (err) {
     console.error("Error in /chat/forward:", err);
