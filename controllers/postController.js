@@ -1,81 +1,35 @@
 import Post from '../models/postModel.js'
 
-// Fetch posts
-const getAllPosts = async (req, res) => {
+export const getAllPosts = async (req, res) => {
   try {
-    res.set("Cache-Control", "no-store");
-    const posts = await Post.find()
-      .populate("postedBy", "_id username")
-      .populate("comments.commentedBy", "_id username")
-      .sort("-createdAt");
-    res.status(200).json(posts);
-  } catch (err) {
-    console.error("Error fetching posts:", err);
-    res.status(500).json({ error: "Failed to fetch posts" });
-  }
+    const posts = await Post.find().populate("postedBy", "username profilePic").populate("comments.commentedBy", "username profilePic").sort({ createdAt: -1 });
+    res.json(posts);
+  } catch (e) { res.status(500).json({ error: e.message }); }
 };
 
-// Like post
-const likePost = async (req, res) => {
-  const userId = req.user._id;
-  const { postid } = req.params;
-  const post = await Post.findByIdAndUpdate(
-    postid,
-    { $addToSet: { likes: userId } },
-    { new: true }
-  );
+export const getPublicPosts = async (req, res) => {
+  try {
+    const posts = await Post.find().populate("postedBy", "username profilePic").sort({ createdAt: -1 }).limit(20);
+    res.json(posts);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+};
+
+export const likePost = async (req, res) => {
+  const post = await Post.findByIdAndUpdate(req.params.postid, { $addToSet: { likes: req.user._id } }, { new: true });
   res.json(post);
 };
 
-// Unlike post
-const unlikePost = async (req, res) => {
-   const userId = req.user._id;
-  const { postid } = req.params;
-  const post = await Post.findByIdAndUpdate(
-    postid,
-    { $pull: { likes: userId } },
-    { newconst 
-    })
-  res.json(post)
- 
-}
-
-// Comment
-const commentPost = async (req, res) => {
-  const userId = req.user._id;
-  const { postid } = req.params;
-  const { text } = req.body;
-
-  const post = await Post.findByIdAndUpdate(
-    postid,
-    { $push: { comments: { text, commentedBy: userId } } },
-    { new: true }
-  ).populate("comments.commentedBy", "username");
-
+export const unlikePost = async (req, res) => {
+  const post = await Post.findByIdAndUpdate(req.params.postid, { $pull: { likes: req.user._id } }, { new: true });
   res.json(post);
 };
 
-// Delete Post
-const deletePost = async (req, res) => {
-  const { id } = req.params;
-  const post = await Post.findByIdAndDelete(id);
-  if (post) {
-    res.status(200).json({ message: "Post deleted successfully" });
-  } else {
-    res.status(404).json({ message: "Post not found" });
-  }
+export const commentPost = async (req, res) => {
+  const post = await Post.findByIdAndUpdate(req.params.postid, { $push: { comments: { text: req.body.text, commentedBy: req.user._id } } }, { new: true }).populate("comments.commentedBy", "username");
+  res.json(post);
 };
 
-// Public all posts
-const getPublicPosts = async (req, res) => {
-  try {
-    const allPosts = await Post.find();
-    res.status(200).json(allPosts);
-  } catch (err) {
-    console.error("Error fetching posts:", err);
-    res.status(500).json({ error: "Failed to fetch posts" });
-  }
+export const deletePost = async (req, res) => {
+  await Post.findByIdAndDelete(req.params.id);
+  res.json({ message: "Post deleted" });
 };
-
-
-export {getAllPosts,getPublicPosts,deletePost,commentPost,unlikePost,likePost}
