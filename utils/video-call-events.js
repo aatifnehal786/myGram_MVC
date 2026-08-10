@@ -21,18 +21,20 @@ const handleVideoCallEvents = (socket, io, onlineUsers) => {
   };
 
   // Initiate call
-  socket.on(
-    "initiate_call",
-    ({ callerId, receiverId, callType, callerInfo, callId }) => {
-      emitToUser(receiverId, "incoming_call", {
-        callerId,
-        callerName: callerInfo.username,
-        callerAvatar: callerInfo.profilePicture,
-        callType,
-        callId,
-      });
-    }
-  );
+  socket.on("initiate_call", ({ callerId, receiverId, callType, callerInfo, callId }) => {
+    const finalCallId = callId || `${callerId}-${receiverId}-${Date.now()}`;
+    const avatar = callerInfo.profilePicture || callerInfo.profilePic || "/placeholder.svg";
+    const name = callerInfo.username || callerInfo.name || "Unknown";
+    
+    emitToUser(receiverId, "incoming_call", {
+      callerId,
+      callerName: name,
+      callerAvatar: avatar,
+      callerPic: avatar, // fallback
+      callType,
+      callId: finalCallId,
+    });
+  });
 
   // Accept call
   socket.on(
