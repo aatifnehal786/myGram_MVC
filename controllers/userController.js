@@ -43,18 +43,28 @@ export const updateUserProfile = async (req, res) => {
 // ONLY ONE for stats - aggregation version
 export const getAllUsersStats = async (req, res) => {
   try {
-    const stats = await User.aggregate([
-      { $lookup: { from: "posts", localField: "_id", foreignField: "postedBy", as: "posts" } },
+    const usersData = await User.aggregate([
+      {
+        $lookup: {
+          from: 'posts',
+          localField: '_id',
+          foreignField: 'postedBy',
+          as: 'posts'
+        }
+      },
       {
         $project: {
-          _id: 1, username: 1, profilePic: 1,
-          followersCount: { $size: { $ifNull: ["$followers", []] } },
-          followingCount: { $size: { $ifNull: ["$following", []] } },
-          postsCount: { $size: "$posts" },
-          likesReceived: { $sum: { $map: { input: "$posts", as: "p", in: { $size: { $ifNull: ["$$p.likes", []] } } } } }
+          username: 1,
+          profilePic: 1,
+          followersCount: { $size: '$followers' },
+          followingCount: { $size: '$following' },
+          postsCount: { $size: '$posts' },
+          likesReceived: { $sum: '$posts.likes' }
         }
       }
     ]);
-    res.json(stats);
-  } catch (e) { res.status(500).json({ error: e.message }); }
+    res.json(usersData);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 };

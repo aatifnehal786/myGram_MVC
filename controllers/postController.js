@@ -9,7 +9,7 @@ export const getAllPosts = async (req, res) => {
 
 export const getPublicPosts = async (req, res) => {
   try {
-    const posts = await Post.find().populate("postedBy", "username profilePic").sort({ createdAt: -1 }).limit(20);
+    const posts = await Post.find().populate("postedBy", "username profilePic").populate("comments.commentedBy", "username profilePic").sort({ createdAt: -1 }).limit(20);
     res.json(posts);
   } catch (e) { res.status(500).json({ error: e.message }); }
 };
