@@ -32,21 +32,24 @@ export const getFeedStatus = async (req, res) => {
     const statuses = await Status.find({
       user: { $in: followingIds },
       expiresAt: { $gt: new Date() }
-    })
-   .populate('user', 'username profilePic')
-   .sort({ createdAt: -1 });
+    }).populate('user', 'username profilePic').populate('viewers', 'username profilePic').sort({ createdAt: 1 });
 
-    // Group by user
     const grouped = {};
     statuses.forEach(s => {
-      if (!grouped[s.user._id]) grouped[s.user._id] = { user: s.user, statuses: [] };
-      grouped[s.user._id].statuses.push(s);
+      const uid = s.user._id.toString();
+      if (!grouped[uid]) grouped[uid] = { user: s.user, statuses: [] };
+      grouped[uid].statuses.push(s);
     });
-
     res.json(Object.values(grouped));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+};
+
+export const getStatusViewers = async (req, res) => {
+  const status = await Status.findById(req.params.id).populate('viewers', 'username profilePic');
+  if (!status) return res.status(404).json({ error: "Not found" });
+  res.json(status.viewers);
 };
 
 export const viewStatus = async (req, res) => {
