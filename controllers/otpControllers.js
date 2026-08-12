@@ -65,25 +65,4 @@ export const sendEmailOtp = async (req, res) => {
   }
 };
 
-// 📧 Verify Email OTP
-export const verifyEmailOtp = async (req, res) => {
-  const email = req.body.email?.toLowerCase();
-  const otp = req.body.otp?.toString();
 
-  const storedData = otpStorage[email];
-  if (!storedData || storedData.otp !== otp || storedData.expiresAt < Date.now()) {
-    return res.status(400).json({ error: "Invalid or expired OTP" });
-  }
-
-  
-
-  try {
-    await User.updateOne({ email }, { isEmailVerified: true });
-    delete otpStorage[email];
-
-    res.json({ message: "OTP verified successfully" });
-  } catch (err) {
-    console.error("Error verifying OTP:", err);
-    res.status(500).json({ error: "Failed to verify OTP" });
-  }
-};

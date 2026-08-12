@@ -34,7 +34,6 @@ const userSchema = new Schema({
   followers: [{ type: mongoose.Schema.Types.ObjectId, ref: "users" }],
   following: [{ type: mongoose.Schema.Types.ObjectId, ref: "users" }],
   password: { type: String, required: true }, // keep hashed passwords
-  isEmailVerified: { type: Boolean, default: false },
   lastSeen: { type: Date, default: Date.now },
 
   // NEW: devices array to store known/authorized devices and OTP metadata

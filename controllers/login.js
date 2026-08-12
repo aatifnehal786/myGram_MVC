@@ -28,9 +28,7 @@ export const login = async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    if (!user.isEmailVerified) {
-      return res.status(403).json({ message: "Email not verified" });
-    }
+   
 
     // 🔐 Check password
     const isMatch = await bcrypt.compare(password, user.password);
