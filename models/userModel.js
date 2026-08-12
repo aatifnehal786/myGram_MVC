@@ -30,7 +30,6 @@ const userSchema = new Schema({
     }
   },
   profilePic: { type: String,default:"" },
-  chatPin: { type: String, default: null },
   followers: [{ type: mongoose.Schema.Types.ObjectId, ref: "users" }],
   following: [{ type: mongoose.Schema.Types.ObjectId, ref: "users" }],
   password: { type: String, required: true }, // keep hashed passwords
