@@ -3,26 +3,38 @@ import User from '../models/userModel.js';
 
 export const createStatus = async (req, res) => {
   try {
-    const { text, bgColor, mediaType } = req.body;
+    console.log("FILE:", req.file);
+    console.log("BODY:", req.body);
+
+    const { text, mediaType, bgColor } = req.body;
+
     let mediaUrl = null;
+    let finalMediaType = mediaType || 'text';
 
     if (req.file) {
-      mediaUrl = req.file.path; // if using cloudinary multer
+      mediaUrl = req.file.path || req.file.secure_url; // Cloudinary gives .path
+      finalMediaType = req.file.mimetype?.startsWith('video') ? 'video' : 'image';
+    }
+
+    if (!mediaUrl && !text) {
+      return res.status(400).json({ error: "Text or media required" });
     }
 
     const status = await Status.create({
-      user: req.user.id,
-      text,
-      bgColor,
+      user: req.user._id,
       mediaUrl,
-      mediaType: mediaUrl? (mediaType || 'image') : 'text'
+      mediaType: mediaUrl ? finalMediaType : 'text',
+      text: text || null,
+      bgColor: bgColor || '#000000',
     });
 
     res.status(201).json(status);
   } catch (err) {
+    console.error("Create Status Error:", err);
     res.status(500).json({ error: err.message });
   }
 };
+
 
 export const getFeedStatus = async (req, res) => {
   try {

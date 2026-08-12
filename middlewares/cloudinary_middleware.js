@@ -1,76 +1,39 @@
 import multer from 'multer';
-import {CloudinaryStorage} from 'multer-storage-cloudinary'
+import { CloudinaryStorage } from 'multer-storage-cloudinary'
 import cloudinary from '../config/cloudinary.js'
 import path from "path";
 
-// Profile Pic Storage
-const profilePicStorage = new CloudinaryStorage({
-  cloudinary:cloudinary,
-  params: {
-    folder: "profile_pics",
-    allowed_formats: ["jpg", "jpeg", "png"],
-    transformation: [{ width: 300, height: 300, crop: "limit" }],
-  },
-});
-const uploadProfilePic = multer({ storage: profilePicStorage });
-
-// Post & Music Storage
 const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: async (req, file) => {
     let folder = "posts";
-
-    if (file.fieldname === "backgroundMusic") {
-      folder = "music";
-    }
-    if (req.originalUrl.includes('status')) {
-      folder = "status"; // ✅ for status
-    }
+    if (file.fieldname === "backgroundMusic") folder = "music";
+    if (req.originalUrl.includes('status')) folder = "status";
 
     return {
       folder,
-      resource_type: "auto",
-      public_id: `${Date.now()}-${path
-        .parse(file.originalname)
-        .name.replace(/\s+/g, "-")}`,
+      resource_type: "auto", // important for video
+      public_id: `${Date.now()}-${path.parse(file.originalname).name.replace(/\s+/g, "-")}`,
     };
   },
 });
 
 const fileFilter = (req, file, cb) => {
-  const allowedMimeTypes = [
-    // images
-    "image/png",
-    "image/jpeg",
-    "image/jpg",
-    "image/webp",
-
-    // videos
-    "video/mp4",
-    "video/webm",
-    "video/quicktime",
-    "video/x-matroska",
-
-    // audio
-    "audio/mpeg",
-    "audio/mp3",
-    "audio/wav",
+  // Log for debugging
+  console.log("Uploading file:", file.originalname, file.mimetype, "to", req.originalUrl);
+  const allowed = [
+    "image/png","image/jpeg","image/jpg","image/webp",
+    "video/mp4","video/webm","video/quicktime","video/x-matroska",
+    "audio/mpeg","audio/mp3","audio/wav",
   ];
-
-  if (allowedMimeTypes.includes(file.mimetype)) {
-    cb(null, true);
-  } else {
-    cb(new Error("Unsupported file type"), false);
-  }
+  if (allowed.includes(file.mimetype)) cb(null, true);
+  else cb(new Error("Unsupported file type: " + file.mimetype), false);
 };
 
-const upload = multer({ storage: storage,
-
-  fileFilter,
-  limits: {
-    fileSize: 1024 * 1024 * 100, // 100 MB
-  },
+export const upload = multer({ storage, fileFilter, limits: { fileSize: 100 * 1024 * 1024 } });
+export const uploadProfilePic = multer({
+  storage: new CloudinaryStorage({
+    cloudinary,
+    params: { folder: "profile_pics", allowed_formats: ["jpg","jpeg","png"] }
+  })
 });
-
-export { uploadProfilePic, upload };
-
