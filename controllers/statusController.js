@@ -26,8 +26,8 @@ export const createStatus = async (req, res) => {
 
 export const getFeedStatus = async (req, res) => {
   try {
-    const currentUser = await User.findById(req.user.id);
-    const followingIds = [...currentUser.following, req.user.id];
+    const currentUser = await User.findById(req.user._id);
+    const followingIds = [...currentUser.following, req.user._id];
 
     const statuses = await Status.find({
       user: { $in: followingIds },
@@ -57,6 +57,6 @@ export const viewStatus = async (req, res) => {
 };
 
 export const deleteStatus = async (req, res) => {
-  await Status.findOneAndDelete({ _id: req.params.id, user: req.user.id });
+  await Status.findOneAndDelete({ _id: req.params.id, user: req.user._id });
   res.json({ success: true });
 };

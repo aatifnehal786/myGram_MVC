@@ -75,7 +75,7 @@ const deleteChatMessages = async (req, res) => {
 // Get chat between two users (paginated)
 const getChat = async (req, res) => {
   try {
-    const currentUserId = req.user.id;
+    const currentUserId = req.user._id;
     const targetUserId = req.params.userId;
 
     const limit = parseInt(req.query.limit) || 20;
@@ -141,7 +141,7 @@ const searchUsers = async (req, res) => {
 // Get chat list
 const getChatList = async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user._id;
 
     const messages = await Message.find({
   $or: [{ sender: userId }, { receiver: userId }],
@@ -193,7 +193,7 @@ sendTo(senderId, newMsg);
 };
 const deleteForMe = async (req, res) => {
   const { messageId } = req.params;
-  const userId = req.user?.id;
+  const userId = req.user?._id;
 
   console.log("Deleting for user:", userId);
 
@@ -234,7 +234,7 @@ const deleteForMe = async (req, res) => {
 };
 const deleteForEveryone = async (req, res) => {
   const { messageId } = req.params;
-  const userId = req.user.id;
+  const userId = req.user._id;
 
   try {
     const message = await Message.findById(messageId);
