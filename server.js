@@ -18,6 +18,7 @@ import userRoutes from './routes/userRoutes.js'
 import useragent from 'express-useragent'
 import createPosts from './routes/createPosts.js'
 import socketHandler from "./Socket/socket.js";
+import statusRoutes from './routes/statusRoutes.js'
 
 connectDB();
 
@@ -59,6 +60,7 @@ app.use("/api/chats", chatRoutes);
 app.use("/api/password", passwordRoutes);
 app.use("/api/user", userRoutes);
 app.use("/api/create-posts",createPosts)
+app.use("/api/status",statusRoutes);
 
 
 
