@@ -10,9 +10,7 @@ import http from 'http'
 
 import authRoutes from './routes/authRoutes.js'
 import chatRoutes from './routes/chatRoutes.js'
-import deviceRoutes from './routes/deviceRoutes.js'
 import followRoutes from './routes/followRoutes.js'
-import otpRoutes from './routes/otpRoutes.js'
 import passwordRoutes from './routes/passwordRoutes.js'
 import postRoutes from './routes/postRoutes.js'
 import uploadRoutes from './routes/uploadRoutes.js'
@@ -54,7 +52,6 @@ app.set("trust proxy", 1);
 
 // auth Routes
 app.use("/api/auth", authRoutes);
-app.use("/api", deviceRoutes);
 app.use("/api/posts", postRoutes);
 app.use("/api/follow", followRoutes);
 app.use("/api/uploads", uploadRoutes);
@@ -62,8 +59,7 @@ app.use("/api/chats", chatRoutes);
 app.use("/api/password", passwordRoutes);
 app.use("/api/user", userRoutes);
 app.use("/api/create-posts",createPosts)
-// mount
-app.use("/api/otp", otpRoutes);
+
 
 
 const PORT = process.env.PORT || 8000;
