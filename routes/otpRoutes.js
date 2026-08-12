@@ -3,7 +3,6 @@ import {
   sendMobileOtp,
   verifyMobileOtp,
   sendEmailOtp,
-  verifyEmailOtp,
 } from "../controllers/otpControllers.js";
 
 const router = express.Router();
@@ -14,6 +13,6 @@ router.post("/verify-otp", verifyMobileOtp);
 
 // 📧 Email OTP
 router.post("/send-email-otp", sendEmailOtp);
-router.post("/verify-email-otp", verifyEmailOtp);
+
 
 export default router;

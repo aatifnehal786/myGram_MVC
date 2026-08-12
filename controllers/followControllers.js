@@ -87,19 +87,39 @@ const unfollowUser = async (req, res) => {
 /* ===========================
    FOLLOW STATUS
 =========================== */
+/* ===========================
+   FOLLOW STATUS - UPDATED FOR FOLLOW BACK
+=========================== */
 const followStatus = async (req, res) => {
   try {
     const loggedUserId = req.user._id;
     const { targetUserId } = req.params;
 
+    if (loggedUserId.toString() === targetUserId) {
+      return res.json({ status: "self" });
+    }
+
+    // 1. Do I follow him?
     const isFollowing = await User.exists({
-      _id: targetUserId,
-      followers: loggedUserId,
+      _id: loggedUserId,
+      following: targetUserId,
     });
 
-    res.json({
-      status: isFollowing ? "following" : "follow",
+    // 2. Does he follow me?
+    const isFollowedBy = await User.exists({
+      _id: loggedUserId,
+      followers: targetUserId,
     });
+
+    let status = "follow";
+    if (isFollowing) {
+      status = "following";
+    } else if (isFollowedBy) {
+      // He follows me, but I don't follow him -> Show Follow Back
+      status = "follow_back";
+    }
+
+    res.json({ status });
   } catch (error) {
     console.error("Follow status error:", error);
     res.status(500).json({ status: "follow" });
@@ -117,22 +137,24 @@ const getFollowers = async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
+
+    // Get logged-in user's following list to check follow-back
+    const loggedInUser = await User.findById(req.user._id).select("following");
+    const myFollowingIds = new Set(loggedInUser.following.map(id => id.toString()));
+
     const conversations = await Conversation.find({
       participants: req.params.userId,
     }).populate("lastMessage");
 
     const conversationMap = {};
-
     conversations.forEach((conv) => {
       const otherUserId = conv.participants.find(
         (id) => id.toString() !== req.params.userId
       );
-
       if (otherUserId) {
         conversationMap[otherUserId.toString()] = {
           conversationId: conv._id,
-          unreadCount:
-            conv.unreadCounts.get(req.params.userId) || 0,
+          unreadCount: conv.unreadCounts.get(req.params.userId) || 0,
           lastMessage: conv.lastMessage,
         };
       }
@@ -141,39 +163,29 @@ const getFollowers = async (req, res) => {
     const onlineUserIds = Array.from(global.onlineUsers?.keys() || []);
 
     const followersWithOnlineStatus = user.followers.map((f) => {
-      const conversation =
-        conversationMap[f._id.toString()] || {};
+      const conversation = conversationMap[f._id.toString()] || {};
+      const isFollowingBack = myFollowingIds.has(f._id.toString());
 
       return {
         _id: f._id,
         username: f.username,
         profilePic: f.profilePic,
         lastSeen: f.lastSeen,
-
-        isOnline: onlineUserIds.includes(
-          f._id.toString()
-        ),
-
-        conversationId:
-          conversation.conversationId || null,
-
-        unreadCount:
-          conversation.unreadCount || 0,
-
-        lastMessage:
-          conversation.lastMessage || null,
+        isOnline: onlineUserIds.includes(f._id.toString()),
+        conversationId: conversation.conversationId || null,
+        unreadCount: conversation.unreadCount || 0,
+        lastMessage: conversation.lastMessage || null,
+        // NEW FIELD FOR FOLLOW BACK
+        status: isFollowingBack ? "following" : "follow_back",
       };
     });
 
+    // ... your sorting code remains same
     followersWithOnlineStatus.sort((a, b) => {
       if (!a.lastMessage && !b.lastMessage) return 0;
       if (!a.lastMessage) return 1;
       if (!b.lastMessage) return -1;
-
-      return (
-        new Date(b.lastMessage.createdAt) -
-        new Date(a.lastMessage.createdAt)
-      );
+      return new Date(b.lastMessage.createdAt) - new Date(a.lastMessage.createdAt);
     });
 
     res.json({ followers: followersWithOnlineStatus });
@@ -182,7 +194,6 @@ const getFollowers = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
-
 
 const getFollowing = async (req, res) => {
   try {
