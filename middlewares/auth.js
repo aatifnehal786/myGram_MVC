@@ -45,18 +45,7 @@ const verifiedToken = async (req, res, next) => {
             });
         }
 
-        // ==========================
-        // Device Verification
-        // ==========================
-        const currentDeviceId = req.headers["x-device-id"];
-
-        const device = user.devices.find((d) => d.deviceId === currentDeviceId);
-
-        if (!device || !device.authorized) {
-            return res.status(403).json({
-                error: "Device removed or unauthorized. Please login again.",
-            });
-        }
+    
 
         req.user = user;
 
