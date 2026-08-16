@@ -7,56 +7,26 @@ export const createPost = async (req, res) => {
 
     const { caption, mediaType } = req.body;
 
-    // FIXED
-    if (!req.files || !req.files.media) {
-      return res.status(400).json({
-        success: false,
-        error: "Media file missing",
-      });
+    const mediaFile = req.files?.media?.[0];
+    if (!mediaFile) {
+      return res.status(400).json({ success: false, error: "Media file missing" });
     }
 
-    // FIXED
-    const mediaFile = req.files.media[0];
-
-    console.log("Uploaded media:", mediaFile);
-
-    const mediaUrl = mediaFile.path;
-
-   const musicFile = req.files.backgroundMusic?.[0];
-
-const musicUrl =
-  musicFile?.path ||
-  musicFile?.secure_url ||
-  null;
+    const mediaUrl = mediaFile.path || mediaFile.secure_url;
+    const musicFile = req.files.backgroundMusic?.[0];
+    const musicUrl = musicFile?.path || musicFile?.secure_url || null;
 
     const post = await Post.create({
       caption,
-
-      mediaType,
-
+      mediaType: mediaType || (mediaFile.mimetype.startsWith("video")? "video" : "image"),
       mediaUrl,
-
-      backgroundMusic:
-        mediaType === "image"
-          ? musicUrl
-          : null,
-
-      postedBy: req.user.id,
+      backgroundMusic: musicUrl, // allow music for video too if you want
+      postedBy: req.user._id || req.user.id,
     });
 
-    console.log(req.files);
-
-    return res.status(201).json({
-      success: true,
-      message: "Post created successfully",
-      post,
-    });
+    return res.status(201).json({ success: true, post });
   } catch (err) {
     console.error("FULL ERROR:", err);
-
-    return res.status(500).json({
-      success: false,
-      error: err.message,
-    });
+    return res.status(500).json({ success: false, error: err.message });
   }
 };
