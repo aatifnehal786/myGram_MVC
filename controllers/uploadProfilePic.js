@@ -1,4 +1,4 @@
-import User from '../models/User.js';
+import User from '../models/userModel.js';
 export const updateProfilePicController = async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
