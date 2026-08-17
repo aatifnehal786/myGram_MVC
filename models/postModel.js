@@ -8,9 +8,10 @@ const postSchema = new mongoose.Schema({
   postedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'users' },
   likes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'users' }],
   comments: [{
-    text: String,
-    commentedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'users' }
-  }],
+  text: String,
+  commentedBy: { type: mongoose.Schema.Types.ObjectId, ref: "users" },
+  
+}]
 }, { timestamps: true });
 
 const Post =  mongoose.model('posts', postSchema); // singular name 'Post'
