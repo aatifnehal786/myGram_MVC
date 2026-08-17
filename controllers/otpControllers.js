@@ -16,7 +16,7 @@ export const sendMobileOtp = async (req, res) => {
       .services(process.env.TWILLO_SERVICE_SID)
       .verifications.create({ to: `+91${mobile}`, channel: "sms" });
 
-    res.json({ message: "OTP sent", status: verification.status });
+    res.status(200).json({ message: "OTP sent", status: verification.status });
   } catch (err) {
     console.error("OTP Send Error:", err.message);
     res.status(500).json({ error: err.message });
