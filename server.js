@@ -29,6 +29,7 @@ app.use(cors({
   origin: ["https://mygram247.netlify.app", "http://localhost:5173"],
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  exposedHeaders: ['Content-Disposition', 'Content-Type']
 }));
 
 // Create limiter
