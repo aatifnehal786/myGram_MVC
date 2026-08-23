@@ -227,7 +227,6 @@ const deleteForMe = async (req, res) => {
 
 
 
-
 const deleteForEveryone = async (req, res) => {
   const { messageId } = req.params;
   const userId = req.user._id || req.user.id; // FIX: fallback
