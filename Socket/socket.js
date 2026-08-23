@@ -20,7 +20,7 @@ const findOrCreateConversation = async (senderId, receiverId) => {
 // --- ADDED: Rate limit storage ---
 const messageRateLimits = new Map(); // userId -> [timestamps]
 const WINDOW_MS = 60 * 1000; // 1 minute
-const MAX_MSG = 20;
+const MAX_MSG = 10;
 
 function socketHandler(server) {
   const io = new Server(server, {
