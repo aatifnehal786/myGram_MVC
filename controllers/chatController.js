@@ -191,34 +191,27 @@ sendTo(senderId, newMsg);
     res.status(500).json({ error: "Failed to forward message" });
   }
 };
+
 const deleteForMe = async (req, res) => {
   const { messageId } = req.params;
-  const userId = req.user?._id;
+  const userId = req.user?._id || req.user?.id; // FIX: fallback to .id
+  const userIdStr = userId?.toString();
 
-  console.log("Deleting for user:", userId);
+  console.log("Deleting for user:", userIdStr);
 
   try {
     const message = await Message.findById(messageId);
-
     if (!message) {
       return res.status(404).json({ error: "Message not found" });
     }
 
-    console.log("Before:", message.deletedFor);
-
-    // ✅ FORCE update using MongoDB (no mutation issues)
     await Message.updateOne(
       { _id: messageId },
-      {
-        $addToSet: { deletedFor: userId } // 🔥 BEST WAY
-      }
+      { $addToSet: { deletedFor: userId } }
     );
 
-    const updated = await Message.findById(messageId);
-    console.log("After:", updated.deletedFor);
-
-    // 🔥 socket emit
-    const sockets = global.onlineUsers.get(userId);
+    // FIX: use string key for Map
+    const sockets = global.onlineUsers.get(userIdStr);
     if (sockets) {
       sockets.forEach((sockId) => {
         req.app.get("io").to(sockId).emit("messageDeletedForMe", { messageId });
@@ -226,15 +219,19 @@ const deleteForMe = async (req, res) => {
     }
 
     res.json({ message: "Deleted for me" });
-
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Error deleting message" });
   }
 };
+
+
+
+
 const deleteForEveryone = async (req, res) => {
   const { messageId } = req.params;
-  const userId = req.user._id;
+  const userId = req.user._id || req.user.id; // FIX: fallback
+  const userIdStr = userId?.toString();
 
   try {
     const message = await Message.findById(messageId);
@@ -242,23 +239,21 @@ const deleteForEveryone = async (req, res) => {
       return res.status(404).json({ error: "Message not found" });
     }
 
-    // 🔐 Only sender can delete
-    if (message.sender.toString() !== userId) {
+    // FIX: toString() BOTH sides - this was the 403 bug
+    if (message.sender.toString() !== userIdStr) {
       return res.status(403).json({
         error: "You can only delete your own messages",
       });
     }
 
-    // ✅ Mark as deleted
     message.isDeleted = true;
+    message.message = "";
+    message.fileUrl = null;
+    message.fileType = null;
     await message.save();
 
-    // 🔥 SOCKET EMIT TO BOTH USERS
-    const senderId = message.sender.toString();
-    const receiverId = message.receiver.toString();
-
-    const sendToSockets = (userId, event, payload) => {
-      const sockets = global.onlineUsers.get(userId);
+    const sendToSockets = (uid, event, payload) => {
+      const sockets = global.onlineUsers.get(uid?.toString());
       if (sockets) {
         sockets.forEach((sockId) => {
           req.app.get("io").to(sockId).emit(event, payload);
@@ -266,11 +261,10 @@ const deleteForEveryone = async (req, res) => {
       }
     };
 
-    sendToSockets(senderId, "messageDeleted", { messageId });
-    sendToSockets(receiverId, "messageDeleted", { messageId });
+    sendToSockets(message.sender.toString(), "messageDeleted", { messageId });
+    sendToSockets(message.receiver.toString(), "messageDeleted", { messageId });
 
     res.json({ message: "Message deleted for everyone" });
-
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to delete message" });
