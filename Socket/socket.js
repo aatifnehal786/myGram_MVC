@@ -17,6 +17,11 @@ const findOrCreateConversation = async (senderId, receiverId) => {
   return conversation;
 };
 
+// --- ADDED: Rate limit storage ---
+const messageRateLimits = new Map(); // userId -> [timestamps]
+const WINDOW_MS = 60 * 1000; // 1 minute
+const MAX_MSG = 20;
+
 function socketHandler(server) {
   const io = new Server(server, {
     cors: {
@@ -34,7 +39,7 @@ function socketHandler(server) {
 
     socket.on("join", async (userId) => {
       socket.userId = userId;
-      socket.join(userId); // JOIN ROOM - critical fix
+      socket.join(userId);
 
       if (!global.onlineUsers.has(userId)) {
         global.onlineUsers.set(userId, new Set());
@@ -43,11 +48,9 @@ function socketHandler(server) {
 
       await User.findByIdAndUpdate(userId, { isOnline: true });
 
-      // Send full list to new user
       io.to(userId).emit("online-users", Array.from(global.onlineUsers.keys()));
       io.to(userId).emit("online-users-list", Array.from(global.onlineUsers.keys()));
 
-      // Notify others
       socket.broadcast.emit("user-online", { userId });
     });
 
@@ -66,6 +69,31 @@ function socketHandler(server) {
 
     socket.on("sendMessage", async ({ senderId, receiverId, message, fileType, fileUrl, isForwarded }) => {
       try {
+        // --- ADDED: RATE LIMIT LOGIC START ---
+        const now = Date.now();
+        const userId = senderId;
+
+        if (!messageRateLimits.has(userId)) {
+          messageRateLimits.set(userId, []);
+        }
+
+        let timestamps = messageRateLimits.get(userId);
+        // keep only last 1 minute
+        timestamps = timestamps.filter((t) => now - t < WINDOW_MS);
+
+        if (timestamps.length >= MAX_MSG) {
+          console.log(`Rate limit hit for user ${userId}`);
+          // send error back to sender only
+          socket.emit("rate-limit-error", {
+            message: `You can only send ${MAX_MSG} messages per minute. Please slow down!`,
+          });
+          return; // BLOCK the message
+        }
+
+        timestamps.push(now);
+        messageRateLimits.set(userId, timestamps);
+        // --- RATE LIMIT LOGIC END ---
+
         const newMessage = await Message.create({
           sender: senderId,
           receiver: receiverId,
@@ -99,16 +127,11 @@ function socketHandler(server) {
         conversation.lastMessage = newMessage._id;
         await conversation.save();
 
-        // FIX FOR DUPLICATE:
-        // 1. Sender - emit only to this one socket, not to all his devices/tabs
         socket.emit("receiveMessage", newMessage);
-
-        // 2. Sender's other tabs - sync them
         socket.to(senderId).emit("receiveMessage", newMessage);
 
-        // 3. Receiver - send to his room (once, not per socket)
         io.to(receiverId).emit("receiveMessage", {
-         ...newMessage.toObject(),
+          ...newMessage.toObject(),
           unreadCount: conversation.unreadCounts.get(receiverId) || 0,
         });
 
@@ -117,7 +140,6 @@ function socketHandler(server) {
           unreadCount: conversation.unreadCounts.get(receiverId) || 0,
         });
 
-        // Notifications
         if (receiverSockets) {
           for (const sockId of receiverSockets) {
             const sock = io.sockets.sockets.get(sockId);
