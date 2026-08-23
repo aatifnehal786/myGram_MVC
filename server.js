@@ -7,7 +7,7 @@ import express from "express";
 import cors from 'cors'
 import connectDB from "./config/db.js";
 import http from 'http'
-
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import authRoutes from './routes/authRoutes.js'
 import chatRoutes from './routes/chatRoutes.js'
 import followRoutes from './routes/followRoutes.js'
@@ -30,6 +30,24 @@ app.use(cors({
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
 }));
+
+// Create limiter
+const limiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 10, // Limit each IP to 10 requests per windowMs
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+  message: {
+    status: 429,
+    error: 'Too many requests, please try again after 1 minute'
+  },
+  keyGenerator: (req, res) => {
+    return ipKeyGenerator(req.ip);
+  }
+});
+
+ // Apply to all routes
+app.use(limiter)
 
 // app.options("*", cors());
 app.use(express.json());
