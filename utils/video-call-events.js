@@ -4,17 +4,7 @@ const handleVideoCallEvents = (socket, io, onlineUsers) => {
     const sockets = onlineUsers.get(userId);
 
     if (!sockets) return;
-
-      console.log(
-    "EMIT:",
-    event,
-    "TO:",
-    userId,
-    "SOCKETS:",
-    sockets
-  );
-
-
+    
     sockets.forEach((socketId) => {
       io.to(socketId).emit(event, data);
     });
