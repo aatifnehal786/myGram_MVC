@@ -225,6 +225,32 @@ const deleteForMe = async (req, res) => {
   }
 };
 
+const deleteMultipleForMe = async (req, res) => {
+  const { messageIds } = req.body; // ["id1","id2"]
+  const userId = req.user._id || req.user.id;
+  const userIdStr = userId.toString();
+
+  if (!messageIds?.length) return res.status(400).json({ error: "No messages selected" });
+
+  try {
+    await Message.updateMany(
+      { _id: { $in: messageIds } },
+      { $addToSet: { deletedFor: userId } }
+    );
+
+    const sockets = global.onlineUsers.get(userIdStr);
+    if (sockets) {
+      sockets.forEach(sockId => {
+        req.app.get("io").to(sockId).emit("messagesDeletedForMe", { messageIds });
+      });
+    }
+
+    res.json({ message: `${messageIds.length} deleted for you` });
+  } catch (err) {
+    res.status(500).json({ error: "Bulk delete failed" });
+  }
+};
+
 
 
 const deleteForEveryone = async (req, res) => {
@@ -279,6 +305,7 @@ export {
   getChatList,
   forwardMessage,
   deleteForMe,
-  deleteForEveryone
+  deleteForEveryone,
+  deleteMultipleForMe
 };
 
