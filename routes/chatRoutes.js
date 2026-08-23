@@ -8,7 +8,8 @@ import {
   getChatList, 
   forwardMessage, 
   deleteForMe,
-  deleteForEveryone
+  deleteForEveryone,
+  deleteMultipleForMe
  
 } from '../controllers/chatController.js';
 import {blockGuest} from '../controllers/blockGuest.js';
