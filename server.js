@@ -1,10 +1,21 @@
-
 import dns from 'node:dns/promises'
 dns.setServers(["8.8.8.8","1.1.1.1"])
-import dotenv from "dotenv";
-dotenv.config();
+
+import "dotenv/config"; 
+
+// --- SECURITY CHECK AT BOOT ---
+if (!process.env.FIELD_ENCRYPTION_KEY || process.env.FIELD_ENCRYPTION_KEY.length !== 64) {
+  console.error("❌ FATAL: FIELD_ENCRYPTION_KEY must be 64 hex chars. Generate with: node -e \"console.log(require('crypto').randomBytes(32).toString('hex'))\"");
+  process.exit(1);
+}
+if (!process.env.JWT_SECRET_KEY) {
+  console.error("❌ FATAL: JWT_SECRET_KEY missing");
+  process.exit(1);
+}
+
 import express from "express";
 import cors from 'cors'
+import helmet from 'helmet' // ADD THIS
 import connectDB from "./config/db.js";
 import http from 'http'
 import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
@@ -19,11 +30,19 @@ import useragent from 'express-useragent'
 import socketHandler from "./Socket/socket.js";
 import statusRoutes from './routes/statusRoutes.js'
 
-connectDB();
+await connectDB();
 
 const app = express();
 const server = http.createServer(app);
 
+// 1. Trust proxy MUST be first for rate limiter + secure cookies
+app.set("trust proxy", 1);
+
+// 2. Helmet - sets 15+ security headers
+app.use(helmet({
+  crossOriginEmbedderPolicy: false, // needed for S3 images / video
+  contentSecurityPolicy: false, // allow netlify frontend
+}));
 
 app.use(cors({
   origin: ["https://mygram247.netlify.app", "http://localhost:5173"],
@@ -32,44 +51,36 @@ app.use(cors({
   exposedHeaders: ['Content-Disposition', 'Content-Type']
 }));
 
-// Create limiter
+// 3. Rate limiter - after trust proxy
 const limiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute
-  max: 20, // Limit each IP to 20 requests per windowMs
-  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
-  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
-  message: {
-    status: 429,
-    error: 'Too many requests, please try again after 1 minute'
-  },
-  keyGenerator: (req, res) => {
-    return ipKeyGenerator(req.ip);
-  }
+  windowMs: 60 * 1000,
+  max: 60, // increased from 20 - 20 is too low for chat polling + posts
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { status: 429, error: 'Too many requests, slow down' },
+  keyGenerator: (req) => ipKeyGenerator(req.ip),
 });
 
- // Apply to all routes
-app.use(limiter)
+// Stricter limiter for auth routes
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 min
+  max: 10, // 10 login attempts per 15 min
+  message: { status: 429, error: 'Too many login attempts, try after 15 min' },
+  keyGenerator: (req) => ipKeyGenerator(req.ip),
+});
 
-// app.options("*", cors());
-app.use(express.json());
-app.use(express.json({ limit: "50mb" }));
-app.use(express.urlencoded({ extended: true, limit: "50mb" }));
+app.use(limiter); // global
+app.use("/api/auth", authLimiter); // extra strict for auth
+
+app.use(express.json({ limit: "10mb" })); // FIX: only once, 50mb is too big for DDoS
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(useragent.express());
 
-// attach socket.io
-// socketHandler(server);
-// Handling Cors
-
-
-
+// 4. Socket
 const io = socketHandler(server);
-
-// ✅ Now it's defined
 app.set("io", io);
 
-app.set("trust proxy", 1);
-
-// auth Routes
+// 5. Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/posts", postRoutes);
 app.use("/api/user", followRoutes);
@@ -77,9 +88,19 @@ app.use("/api/uploads", uploadRoutes);
 app.use("/api/chats", chatRoutes);
 app.use("/api/password", passwordRoutes);
 app.use("/api/user", userRoutes);
-app.use("/api/status",statusRoutes);
+app.use("/api/status", statusRoutes);
 
+// Health check
+app.get("/", (req, res) => res.send("myGram API running with encryption ✅"));
 
+// Global error handler - don't leak encryption errors
+app.use((err, req, res, next) => {
+  console.error(err);
+  if (err.code === 11000) {
+    return res.status(409).json({ message: "Duplicate field" });
+  }
+  res.status(500).json({ message: "Server error" });
+});
 
 const PORT = process.env.PORT || 8000;
-server.listen(PORT, () => console.log(` Server running on port ${PORT}`));
+server.listen(PORT, () => console.log(`Server running on port ${PORT} with encryption enabled`));

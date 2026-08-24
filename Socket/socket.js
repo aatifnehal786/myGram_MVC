@@ -1,8 +1,9 @@
 import { Server } from "socket.io";
 import User from "../models/userModel.js";
 import Message from "../models/messageModel.js";
-import handleVideoCallEvents from "../utils/video-call-events.js";
 import Conversation from "../models/coversationModal.js";
+import handleVideoCallEvents from "../utils/video-call-events.js";
+import { decrypt } from "../utils/encryption.js"; // ADD THIS
 
 const findOrCreateConversation = async (senderId, receiverId) => {
   let conversation = await Conversation.findOne({
@@ -17,9 +18,8 @@ const findOrCreateConversation = async (senderId, receiverId) => {
   return conversation;
 };
 
-// --- ADDED: Rate limit storage ---
-const messageRateLimits = new Map(); // userId -> [timestamps]
-const WINDOW_MS = 60 * 1000; // 1 minute
+const messageRateLimits = new Map();
+const WINDOW_MS = 60 * 1000;
 const MAX_MSG = 10;
 
 function socketHandler(server) {
@@ -35,69 +35,34 @@ function socketHandler(server) {
   global.onlineUsers = new Map();
 
   io.on("connection", (socket) => {
-    console.log("New socket connected:", socket.id);
-
     socket.on("join", async (userId) => {
       socket.userId = userId;
       socket.join(userId);
-
-      if (!global.onlineUsers.has(userId)) {
-        global.onlineUsers.set(userId, new Set());
-      }
+      if (!global.onlineUsers.has(userId)) global.onlineUsers.set(userId, new Set());
       global.onlineUsers.get(userId).add(socket.id);
-
       await User.findByIdAndUpdate(userId, { isOnline: true });
-
-      io.to(userId).emit("online-users", Array.from(global.onlineUsers.keys()));
-      io.to(userId).emit("online-users-list", Array.from(global.onlineUsers.keys()));
-
+      io.emit("online-users", Array.from(global.onlineUsers.keys()));
       socket.broadcast.emit("user-online", { userId });
-    });
-
-    socket.on("get-online-users", () => {
-      socket.emit("online-users", Array.from(global.onlineUsers.keys()));
-      socket.emit("online-users-list", Array.from(global.onlineUsers.keys()));
-    });
-
-    socket.on("chatOpen", ({ chattingWith }) => {
-      socket.chattingWith = chattingWith;
-    });
-
-    socket.on("chatClose", () => {
-      socket.chattingWith = null;
     });
 
     socket.on("sendMessage", async ({ senderId, receiverId, message, fileType, fileUrl, isForwarded }) => {
       try {
-        // --- ADDED: RATE LIMIT LOGIC START ---
+        // --- Rate limit (your code) ---
         const now = Date.now();
-        const userId = senderId;
-
-        if (!messageRateLimits.has(userId)) {
-          messageRateLimits.set(userId, []);
-        }
-
-        let timestamps = messageRateLimits.get(userId);
-        // keep only last 1 minute
-        timestamps = timestamps.filter((t) => now - t < WINDOW_MS);
-
+        if (!messageRateLimits.has(senderId)) messageRateLimits.set(senderId, []);
+        let timestamps = messageRateLimits.get(senderId).filter(t => now - t < WINDOW_MS);
         if (timestamps.length >= MAX_MSG) {
-          console.log(`Rate limit hit for user ${userId}`);
-          // send error back to sender only
-          socket.emit("rate-limit-error", {
-            message: `You can only send ${MAX_MSG} messages per minute. Please slow down!`,
-          });
-          return; // BLOCK the message
+          socket.emit("rate-limit-error", { message: `Only ${MAX_MSG}/min allowed` });
+          return;
         }
-
         timestamps.push(now);
-        messageRateLimits.set(userId, timestamps);
-        // --- RATE LIMIT LOGIC END ---
+        messageRateLimits.set(senderId, timestamps);
 
-        const newMessage = await Message.create({
+        // 1. Save - model pre-save will ENCRYPT automatically
+        const newMessageDoc = await Message.create({
           sender: senderId,
           receiver: receiverId,
-          message,
+          message, // plain in, encrypted stored
           fileUrl,
           fileType,
           isForwarded,
@@ -105,18 +70,20 @@ function socketHandler(server) {
           isSeen: false,
         });
 
+        // 2. Create a DECRYPTED version for emitting - THIS IS THE FIX
+        // newMessageDoc.message is encrypted right now, so decrypt it for sockets
+        const plainMessageObj = newMessageDoc.toObject();
+        plainMessageObj.message = decrypt(plainMessageObj.message) || message; // fallback to original plain
+
         const conversation = await findOrCreateConversation(senderId, receiverId);
         const receiverSockets = global.onlineUsers.get(receiverId);
-        const senderUser = await User.findById(senderId).select("username profilePic profilePicture");
+        const senderUser = await User.findById(senderId).select("username profilePic");
 
         let chatOpen = false;
         if (receiverSockets) {
           for (const sockId of receiverSockets) {
             const sock = io.sockets.sockets.get(sockId);
-            if (sock?.chattingWith === senderId) {
-              chatOpen = true;
-              break;
-            }
+            if (sock?.chattingWith === senderId) { chatOpen = true; break; }
           }
         }
 
@@ -124,14 +91,15 @@ function socketHandler(server) {
           const currentUnread = conversation.unreadCounts.get(receiverId) || 0;
           conversation.unreadCounts.set(receiverId, currentUnread + 1);
         }
-        conversation.lastMessage = newMessage._id;
+        conversation.lastMessage = newMessageDoc._id;
         await conversation.save();
 
-        socket.emit("receiveMessage", newMessage);
-        socket.to(senderId).emit("receiveMessage", newMessage);
+        // 3. Emit PLAIN version
+        socket.emit("receiveMessage", plainMessageObj);
+        socket.to(senderId).emit("receiveMessage", plainMessageObj);
 
         io.to(receiverId).emit("receiveMessage", {
-          ...newMessage.toObject(),
+          ...plainMessageObj,
           unreadCount: conversation.unreadCounts.get(receiverId) || 0,
         });
 
@@ -140,6 +108,7 @@ function socketHandler(server) {
           unreadCount: conversation.unreadCounts.get(receiverId) || 0,
         });
 
+        // Notification - send plain preview
         if (receiverSockets) {
           for (const sockId of receiverSockets) {
             const sock = io.sockets.sockets.get(sockId);
@@ -147,9 +116,9 @@ function socketHandler(server) {
             io.to(sockId).emit("newNotification", {
               senderId,
               senderName: senderUser.username,
-              senderProfilePic: senderUser.profilePic || senderUser.profilePicture,
-              text: message || "New message",
-              messageId: newMessage._id,
+              senderProfilePic: senderUser.profilePic,
+              text: plainMessageObj.message || "New file",
+              messageId: newMessageDoc._id,
             });
           }
         }
@@ -169,54 +138,43 @@ function socketHandler(server) {
       io.to(otherUserId).emit("messagesSeen", { userId });
     });
 
-    socket.on("typing", ({ senderId, receiverId }) => {
-      io.to(receiverId).emit("typing", senderId);
-    });
-
-    socket.on("stopTyping", ({ senderId, receiverId }) => {
-      io.to(receiverId).emit("stopTyping", senderId);
-    });
+    socket.on("typing", ({ senderId, receiverId }) => io.to(receiverId).emit("typing", senderId));
+    socket.on("stopTyping", ({ senderId, receiverId }) => io.to(receiverId).emit("stopTyping", senderId));
+    socket.on("chatOpen", ({ chattingWith }) => { socket.chattingWith = chattingWith; });
+    socket.on("chatClose", () => { socket.chattingWith = null; });
 
     handleVideoCallEvents(socket, io, global.onlineUsers);
 
     socket.on("react-message", async ({ messageId, emoji, userId }) => {
-      try {
-        const message = await Message.findById(messageId);
-        if (!message) return;
-        const existing = message.reactions.find((r) => r.user.toString() === userId && r.emoji === emoji);
-        if (existing) {
-          message.reactions = message.reactions.filter((r) =>!(r.user.toString() === userId && r.emoji === emoji));
-        } else {
-          message.reactions.push({ user: userId, emoji });
-        }
-        await message.save();
-        io.to(message.sender.toString()).emit("message-reaction", { messageId, reactions: message.reactions });
-        io.to(message.receiver.toString()).emit("message-reaction", { messageId, reactions: message.reactions });
-      } catch (err) {
-        console.error("Reaction socket error:", err);
+      const message = await Message.findById(messageId);
+      if (!message) return;
+      const existing = message.reactions.find(r => r.user.toString() === userId && r.emoji === emoji);
+      if (existing) {
+        message.reactions = message.reactions.filter(r => !(r.user.toString() === userId && r.emoji === emoji));
+      } else {
+        message.reactions.push({ user: userId, emoji });
       }
+      await message.save();
+      // reactions don't need encryption
+      io.to(message.sender.toString()).emit("message-reaction", { messageId, reactions: message.reactions });
+      io.to(message.receiver.toString()).emit("message-reaction", { messageId, reactions: message.reactions });
     });
 
     socket.on("disconnect", async () => {
       const userId = socket.userId;
       if (!userId) return;
-      const socketSet = global.onlineUsers.get(userId);
-      if (!socketSet) return;
-
-      socketSet.delete(socket.id);
+      const set = global.onlineUsers.get(userId);
+      if (!set) return;
+      set.delete(socket.id);
       socket.leave(userId);
-
-      if (socketSet.size === 0) {
+      if (set.size === 0) {
         global.onlineUsers.delete(userId);
         await User.findByIdAndUpdate(userId, { isOnline: false, lastSeen: new Date() });
         socket.broadcast.emit("user-offline", { userId, lastSeen: new Date() });
         io.emit("online-users", Array.from(global.onlineUsers.keys()));
-        io.emit("online-users-list", Array.from(global.onlineUsers.keys()));
       }
-      console.log("Socket disconnected:", socket.id);
     });
   });
-
   return io;
 }
 

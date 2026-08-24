@@ -3,8 +3,11 @@ import Post from '../models/postModel.js'
 
 export const getUserStats = async (req, res) => {
   try {
-    const user = await User.findById(req.params.id);
-    const posts = await Post.find({ postedBy: req.params.id });
+    // Only select what you need - never return email/mobile here
+    const user = await User.findById(req.params.id).select("username profilePic followers following");
+    if(!user) return res.status(404).json({ error: "User not found" });
+    
+    const posts = await Post.find({ postedBy: req.params.id }).select("likes");
     res.json({
       _id: user._id,
       username: user.username,
@@ -19,6 +22,7 @@ export const getUserStats = async (req, res) => {
 
 export const getAllUsersExceptMe = async (req, res) => {
   try {
+    // SAFE: only username, profilePic
     const users = await User.find({ _id: { $ne: req.user._id } }).select("username profilePic");
     res.json(users);
   } catch { res.status(500).json({ error: "Server error" }); }
@@ -31,18 +35,32 @@ export const getAllUsers = async (req, res) => {
   } catch { res.status(500).json({ error: "Server error" }); }
 };
 
-
 export const updateUserProfile = async (req, res) => {
   try {
     const { newUsername } = req.body;
-    const updated = await User.findByIdAndUpdate(req.user._id, { username: newUsername.trim() }, { new: true }).select("-password");
+    if(!newUsername || newUsername.trim().length < 3) {
+      return res.status(400).json({ error: "Username too short" });
+    }
+    // IMPORTANT: Check username uniqueness separately because email is encrypted now
+    const exists = await User.findOne({ username: newUsername.trim(), _id: { $ne: req.user._id } });
+    if(exists) return res.status(409).json({ error: "Username taken" });
+
+    const updated = await User.findByIdAndUpdate(
+      req.user._id, 
+      { username: newUsername.trim() }, 
+      { new: true }
+    ).select("username profilePic"); // NEVER return emailHash/mobileHash
+
     res.json({ message: "Updated", newUsername: updated.username, user: updated });
-  } catch { res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { 
+    if(err.code === 11000) return res.status(409).json({ error: "Username taken" });
+    res.status(500).json({ error: 'Server error' }); 
+  }
 };
 
-// ONLY ONE for stats - aggregation version
 export const getAllUsersStats = async (req, res) => {
   try {
+    // Aggregation bypasses mongoose decrypt hooks - so ONLY project non-encrypted fields
     const usersData = await User.aggregate([
       {
         $lookup: {
@@ -59,7 +77,8 @@ export const getAllUsersStats = async (req, res) => {
           followersCount: { $size: '$followers' },
           followingCount: { $size: '$following' },
           postsCount: { $size: '$posts' },
-          likesReceived: { $sum: '$posts.likes' }
+          // likesReceived will be wrong if you sum array of arrays - fixed:
+          likesReceived: { $sum: { $map: { input: "$posts", as: "p", in: { $size: "$$p.likes" } } } }
         }
       }
     ]);

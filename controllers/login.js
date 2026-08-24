@@ -1,52 +1,42 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import crypto from "crypto";
 import User from "../models/userModel.js";
-import { sendOtpEmail } from "../utils/sendMail.js";
-import OTP from "../models/otpModels.js";
+import { blindIndex } from "../models/userModel.js";
 
 export const login = async (req, res) => {
   const { loginId, password } = req.body;
-  
-
   try {
-   
-
-    // 🔍 Find user
+    const normalizedId = loginId.toLowerCase().trim();
+    
+    // Search using blind index for encrypted fields
     const user = await User.findOne({
       $or: [
-        { email: loginId.toLowerCase() },
-        { username: loginId },
-        { mobile: loginId },
+        { emailHash: blindIndex(normalizedId) },
+        { mobileHash: blindIndex(loginId) }, // mobile blindIndex also uses toLowerCase, safe
+        { username: loginId }, // username is NOT encrypted
       ],
     });
 
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
-console.log("User found:", user);
-   
+    if (!user) return res.status(404).json({ message: "User not found" });
 
-    // 🔐 Check password
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return res.status(401).json({ message: "Incorrect password" });
-    }
-   
-      const token = jwt.sign(
-        { email: user.email, id: user._id },
-        process.env.JWT_SECRET_KEY,
-        { expiresIn: "7d" }
-      );
+    if (!isMatch) return res.status(401).json({ message: "Incorrect password" });
 
-      res.json({
-        message: "Login successful",
-        token,
-        userid: user._id,
-        name: user.username,
-        profilePic: user.profilePic || user.profilePicture, // ADD THIS
-        profilePicture: user.profilePic || user.profilePicture,
-      });
+    // NEVER put email in JWT - it's sensitive. Put id and username
+    const token = jwt.sign(
+      { id: user._id, username: user.username },
+      process.env.JWT_SECRET_KEY,
+      { expiresIn: "7d" }
+    );
+
+    res.json({
+      message: "Login successful",
+      token,
+      userid: user._id,
+      name: user.username,
+      email: user.email, // this will be auto-decrypted by post hook
+      profilePic: user.profilePic,
+    });
 
   } catch (err) {
     console.error("Login error:", err);

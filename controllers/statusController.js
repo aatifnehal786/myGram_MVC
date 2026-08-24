@@ -3,48 +3,47 @@ import User from '../models/userModel.js';
 
 export const createStatus = async (req, res) => {
   try {
-    console.log("FILE:", req.file);
-    console.log("BODY:", req.body);
-
     const { text, mediaType, bgColor } = req.body;
-
     let mediaUrl = null;
     let finalMediaType = mediaType || 'text';
-
     if (req.file) {
-      mediaUrl = req.file.path || req.file.secure_url; // Cloudinary gives .path
-      finalMediaType = req.file.mimetype?.startsWith('video') ? 'video' : 'image';
+      mediaUrl = req.file.path || req.file.secure_url;
+      finalMediaType = req.file.mimetype?.startsWith('video')? 'video' : 'image';
     }
-
-    if (!mediaUrl && !text) {
-      return res.status(400).json({ error: "Text or media required" });
-    }
+    if (!mediaUrl &&!text) return res.status(400).json({ error: "Text or media required" });
 
     const status = await Status.create({
       user: req.user._id,
-      mediaUrl,
-      mediaType: mediaUrl ? finalMediaType : 'text',
-      text: text || null,
+      mediaUrl, // plain URL - not encrypted
+      mediaType: mediaUrl? finalMediaType : 'text',
+      text: text || null, // model will encrypt this
       bgColor: bgColor || '#000000',
     });
 
-    res.status(201).json(status);
+    // Return decrypted for immediate frontend display
+    const plain = status.toObject();
+    const { decrypt } = await import("../utils/encryption.js");
+    if(plain.text) plain.text = decrypt(plain.text);
+    res.status(201).json(plain);
+
   } catch (err) {
     console.error("Create Status Error:", err);
     res.status(500).json({ error: err.message });
   }
 };
 
-
 export const getFeedStatus = async (req, res) => {
   try {
-    const currentUser = await User.findById(req.user._id);
+    // FIX: select only following field to avoid loading decrypted email in memory unnecessarily
+    const currentUser = await User.findById(req.user._id).select("following");
     const followingIds = [...currentUser.following, req.user._id];
 
     const statuses = await Status.find({
       user: { $in: followingIds },
       expiresAt: { $gt: new Date() }
-    }).populate('user', 'username profilePic').populate('viewers', 'username profilePic').sort({ createdAt: 1 });
+    }).populate('user', 'username profilePic').populate('viewers', 'username profilePic').sort({ createdAt: -1 });
+
+    // statuses.text is already auto-decrypted by post hook
 
     const grouped = {};
     statuses.forEach(s => {
@@ -65,9 +64,7 @@ export const getStatusViewers = async (req, res) => {
 };
 
 export const viewStatus = async (req, res) => {
-  await Status.findByIdAndUpdate(req.params.id, {
-    $addToSet: { viewers: req.user._id }
-  });
+  await Status.findByIdAndUpdate(req.params.id, { $addToSet: { viewers: req.user._id } });
   res.json({ success: true });
 };
 
