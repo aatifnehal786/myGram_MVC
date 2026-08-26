@@ -25,7 +25,7 @@ const MAX_MSG = 10;
 function socketHandler(server) {
   const io = new Server(server, {
     cors: {
-      origin: ["http://localhost:5173", "https://mygram247.netlify.app"],
+      origin: ["http://localhost:5173", "https://mygram247.netlify.app","http://localhost:8081"],
       credentials: true,
     },
     transports: ["websocket", "polling"],

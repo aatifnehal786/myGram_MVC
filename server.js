@@ -45,7 +45,7 @@ app.use(helmet({
 }));
 
 app.use(cors({
-  origin: ["https://mygram247.netlify.app", "http://localhost:5173"],
+  origin: ["https://mygram247.netlify.app", "http://localhost:5173","http://localhost:8081"],
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   exposedHeaders: ['Content-Disposition', 'Content-Type']
