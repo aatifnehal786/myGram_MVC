@@ -17,6 +17,13 @@ const MessageSchema = new mongoose.Schema({
     reactions: [reactionSchema],
     isDeleted: { type: Boolean, default: false },
     deletedFor: [{ type: mongoose.Schema.Types.ObjectId, ref: "users" }],
+
+    // ✅ NEW for call logs
+    messageType: { type: String, enum: ["text", "call_log"], default: "text" },
+    callInfo: {
+      type: { type: String, enum: ["missed", "rejected", "ended", "incoming"] },
+      duration: { type: Number, default: 0 }
+    }
   }, { timestamps: true }
 );
 
@@ -27,7 +34,7 @@ MessageSchema.pre("save", function(next) {
   next();
 });
 
-const decryptMsg = (doc) => { if(doc?.message) doc.message = decrypt(doc.message); };
+const decryptMsg = (doc) => { if(doc?.message) try{ doc.message = decrypt(doc.message); }catch{} };
 MessageSchema.post(/^find/, function(docs) {
   if(Array.isArray(docs)) docs.forEach(decryptMsg);
   else decryptMsg(docs);
