@@ -4,7 +4,7 @@ import crypto from "crypto";
 import bcrypt from "bcryptjs";
 
 const ALGO = "aes-256-gcm";
-const KEY = Buffer.from(process.env.FIELD_ENCRYPTION_KEY, 'hex'); // 64 hex chars
+const KEY = Buffer.from(process.env.FIELD_ENCRYPTION_KEY, 'hex'); // 64 hex chars = 32 bytes
 
 const encrypt = (text) => {
   if(!text) return text;
@@ -44,21 +44,30 @@ const userSchema = new Schema({
   lastSeen: { type: Date, default: Date.now },
 }, { timestamps: true });
 
-userSchema.pre("save", async function(next) {
-  // hash password only once - check if already hashed
-  if(this.isModified("password") && !this.password.startsWith("$2a$")) {
-    const salt = await bcrypt.genSalt(12);
-    this.password = await bcrypt.hash(this.password, salt);
+// FIX: pre('validate') not pre('save')
+userSchema.pre("validate", async function(next) {
+  try {
+    if(this.isModified("password") && this.password) {
+      // hash only if not already hashed ($2a$ or $2b$)
+      if(!this.password.startsWith("$2a$") &&!this.password.startsWith("$2b$")) {
+        const salt = await bcrypt.genSalt(12);
+        this.password = await bcrypt.hash(this.password, salt);
+      }
+    }
+    if(this.isModified("email") && this.email) {
+      // hash BEFORE encrypting
+      const lower = String(this.email).toLowerCase().trim();
+      this.emailHash = blindIndex(lower);
+      this.email = encrypt(lower);
+    }
+    if(this.isModified("mobile") && this.mobile) {
+      this.mobileHash = blindIndex(this.mobile);
+      this.mobile = encrypt(this.mobile);
+    }
+    next();
+  } catch (err) {
+    next(err);
   }
-  if(this.isModified("email")) {
-    this.emailHash = blindIndex(this.email);
-    this.email = encrypt(this.email.toLowerCase());
-  }
-  if(this.isModified("mobile")) {
-    this.mobileHash = blindIndex(this.mobile);
-    this.mobile = encrypt(this.mobile);
-  }
-  next();
 });
 
 const decryptUser = (doc) => {
@@ -69,6 +78,10 @@ const decryptUser = (doc) => {
 userSchema.post(/^find/, function(docs) {
   if(Array.isArray(docs)) docs.forEach(decryptUser);
   else decryptUser(docs);
+});
+
+userSchema.post('findOne', function(doc) {
+  decryptUser(doc);
 });
 
 const User = mongoose.model("users", userSchema);
