@@ -40,5 +40,5 @@ export const uploadProfilePic = multer({
       transformation: [{ width: 500, height: 500, crop: "fill", gravity: "face" }],
     },
   }),
-  limits: { fileSize: 2 * 1024 * 1024 },
+  limits: { fileSize: 10 * 1024 * 1024 },
 });
