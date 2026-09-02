@@ -42,6 +42,7 @@ const userSchema = new Schema({
   following: [{ type: mongoose.Schema.Types.ObjectId, ref: "users" }],
   password: { type: String, required: true },
   lastSeen: { type: Date, default: Date.now },
+  isEmailVerified: { type: Boolean, default: false },
 }, { timestamps: true });
 
 // FIX: pre('validate') not pre('save')
