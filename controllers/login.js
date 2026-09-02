@@ -43,6 +43,7 @@ export const login = async (req, res) => {
       name: user.username,
       email: user.email, // this will be auto-decrypted by post hook
       profilePic: user.profilePic,
+      isEmailVerified: user.isEmailVerified 
     });
 
   } catch (err) {
