@@ -2,23 +2,20 @@ import jwt from "jsonwebtoken";
 import { v4 as uuidv4 } from "uuid";
 
 export const guestLogin = async (req, res) => {
-
-    // guest fullname entered by guest user
     const { fullName } = req.body;
     try {
-
         const guestId = uuidv4();
 
         const token = jwt.sign( 
             {
                 id: guestId,
+                fullName: fullName || "Guest User", // ADD THIS
                 role: "guest",
-                isGuest: true
+                isGuest: true,
+                isVerified: true // ADD THIS
             },
             process.env.JWT_SECRET_KEY,
-            {
-                expiresIn: "7d"
-            }
+            { expiresIn: "7d" }
         );
 
         res.status(200).json({
@@ -30,14 +27,11 @@ export const guestLogin = async (req, res) => {
                 username: fullName || "Guest User",
                 fullName: fullName || "Guest User",
                 profilePic: "",
-                isGuest: true
+                isGuest: true,
+                isVerified: true // ADD THIS
             }
         });
-
     } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: error.message
-        });
+        res.status(500).json({ success: false, message: error.message });
     }
 };

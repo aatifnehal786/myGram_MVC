@@ -29,6 +29,7 @@ const verifiedToken = async (req, res, next) => {
                 fullName: decoded.fullName || "Guest User",
                 role: "guest",
                 isGuest: true,
+                isVerified: true,
             };
 
             return next();
