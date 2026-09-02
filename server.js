@@ -26,6 +26,7 @@ import passwordRoutes from './routes/passwordRoutes.js'
 import postRoutes from './routes/postRoutes.js'
 import uploadRoutes from './routes/uploadRoutes.js'
 import userRoutes from './routes/userRoutes.js'
+import otpRoutes from './routes/otpRoutes.js'
 import useragent from 'express-useragent'
 import socketHandler from "./Socket/socket.js";
 import statusRoutes from './routes/statusRoutes.js'
@@ -89,6 +90,7 @@ app.use("/api/chats", chatRoutes);
 app.use("/api/password", passwordRoutes);
 app.use("/api/user", userRoutes);
 app.use("/api/status", statusRoutes);
+app.use("/api/otp", otpRoutes);
 
 // Health check
 app.get("/", (req, res) => res.send("myGram API running with encryption ✅"));
