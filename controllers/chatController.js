@@ -6,6 +6,7 @@ import User from "../models/userModel.js";
 import Cloudinary from "../config/cloudinary.js";
 import Conversation from "../models/coversationModal.js";
 import { decrypt } from "../utils/encryption.js";
+import path from "path";
 
 const upload = multer();
 
