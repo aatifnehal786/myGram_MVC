@@ -4,34 +4,173 @@ import streamifier from "streamifier";
 import Message from "../models/messageModel.js";
 import User from "../models/userModel.js";
 import Cloudinary from "../config/cloudinary.js";
+import Conversation from "../models/coversationModal.js";
 import { decrypt } from "../utils/encryption.js";
 
 const upload = multer();
 
 // Chat file upload - DON'T encrypt fileUrl
 const uploadChatFile = [
-  upload.single("file"), async (req, res) => {
+  upload.single("file"),
+  async (req, res) => {
     try {
       const mimeType = req.file.mimetype;
+      const originalName = req.file.originalname; // e.g. My Resume.pdf
+      const parsed = path.parse(originalName);
+      const safeBase = parsed.name.replace(/\s+/g, "-").replace(/[^a-zA-Z0-9-_]/g, "");
+
       let resourceType = "auto";
       if (["application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"].includes(mimeType) || mimeType.startsWith("text/")) {
         resourceType = "raw";
       }
+
       const streamUpload = () => new Promise((resolve, reject) => {
         const stream = Cloudinary.uploader.upload_stream(
-          { resource_type: resourceType, folder: "chat_files", type: "upload" },
-          (error, result) => (result ? resolve(result) : reject(error))
+          {
+            resource_type: resourceType,
+            folder: "chat_files",
+            type: "upload",
+            public_id: safeBase, // will be file name in cloudinary
+            use_filename: true,
+            unique_filename: true, // important for chat so files don't overwrite
+            filename_override: originalName, // forces download with original name
+          },
+          (error, result) => (result? resolve(result) : reject(error))
         );
         streamifier.createReadStream(req.file.buffer).pipe(stream);
       });
+
       const result = await streamUpload();
-      res.json({ fileUrl: result.secure_url, fileType: mimeType });
+
+      res.json({
+        fileUrl: result.secure_url,
+        fileType: mimeType,
+        originalFileName: originalName, // ✅ send back to frontend
+        filePublicId: result.public_id,
+        fileSize: req.file.size
+      });
     } catch (err) {
       console.error("Upload error:", err);
       res.status(500).json({ error: "Upload failed" });
     }
   },
 ];
+
+
+
+
+
+const findOrCreateConversation = async (senderId, receiverId) => {
+  let conversation = await Conversation.findOne({
+    participants: { $all: [senderId, receiverId] },
+  });
+  if (!conversation) {
+    conversation = await Conversation.create({
+      participants: [senderId, receiverId],
+      unreadCounts: { [senderId]: 0, [receiverId]: 0 },
+    });
+  }
+  return conversation;
+};
+
+const messageRateLimits = new Map();
+const WINDOW_MS = 60 * 1000;
+const MAX_MSG = 10;
+
+// ✅ This is now your main send controller
+export const sendMessageController = async (req, res) => {
+  try {
+    const senderId = req.user._id.toString();
+    const { receiverId, message, fileUrl, fileType, originalFileName, filePublicId, fileSize, isForwarded } = req.body;
+    const io = req.app.get("io");
+    const onlineUsers = global.onlineUsers;
+
+    // --- Rate limit ---
+    const now = Date.now();
+    if (!messageRateLimits.has(senderId)) messageRateLimits.set(senderId, []);
+    let timestamps = messageRateLimits.get(senderId).filter(t => now - t < WINDOW_MS);
+    if (timestamps.length >= MAX_MSG) {
+      return res.status(429).json({ message: `Only ${MAX_MSG}/min allowed` });
+    }
+    timestamps.push(now);
+    messageRateLimits.set(senderId, timestamps);
+
+    // 1. Save (pre-save hook will encrypt message)
+    const newMessageDoc = await Message.create({
+      sender: senderId,
+      receiver: receiverId,
+      message,
+      fileUrl,
+      fileType,
+      originalFileName: originalFileName || null,
+      filePublicId: filePublicId || null,
+      fileSize: fileSize || null,
+      isForwarded: isForwarded || false,
+      isDelivered: onlineUsers?.has(receiverId),
+      isSeen: false,
+    });
+
+    // 2. Decrypted version for emitting
+    const plainMessageObj = newMessageDoc.toObject();
+    try {
+      plainMessageObj.message = decrypt(plainMessageObj.message) || message;
+    } catch {
+      plainMessageObj.message = message;
+    }
+
+    const conversation = await findOrCreateConversation(senderId, receiverId);
+    const receiverSockets = onlineUsers?.get(receiverId);
+    const senderUser = await User.findById(senderId).select("username profilePic");
+
+    let chatOpen = false;
+    if (receiverSockets && io) {
+      for (const sockId of receiverSockets) {
+        const sock = io.sockets.sockets.get(sockId);
+        if (sock?.chattingWith === senderId) { chatOpen = true; break; }
+      }
+    }
+
+    if (!chatOpen) {
+      const currentUnread = conversation.unreadCounts.get(receiverId) || 0;
+      conversation.unreadCounts.set(receiverId, currentUnread + 1);
+    }
+    conversation.lastMessage = newMessageDoc._id;
+    await conversation.save();
+
+    // 3. Emit via socket if io exists
+    if (io) {
+      io.to(senderId).emit("receiveMessage", plainMessageObj);
+      io.to(receiverId).emit("receiveMessage", {
+        ...plainMessageObj,
+        unreadCount: conversation.unreadCounts.get(receiverId) || 0,
+      });
+      io.to(receiverId).emit("unreadCountUpdated", {
+        senderId,
+        unreadCount: conversation.unreadCounts.get(receiverId) || 0,
+      });
+
+      if (receiverSockets) {
+        for (const sockId of receiverSockets) {
+          const sock = io.sockets.sockets.get(sockId);
+          if (!sock || sock.chattingWith === senderId) continue;
+          io.to(sockId).emit("newNotification", {
+            senderId,
+            senderName: senderUser?.username,
+            senderProfilePic: senderUser?.profilePic,
+            text: plainMessageObj.message || plainMessageObj.originalFileName || "New file",
+            messageId: newMessageDoc._id,
+          });
+        }
+      }
+    }
+
+    return res.status(201).json(plainMessageObj);
+
+  } catch (err) {
+    console.error("Send message error:", err);
+    return res.status(500).json({ error: "Failed to send message" });
+  }
+};
 
 const deleteChatMessages = async (req, res) => {
   try {

@@ -3,29 +3,11 @@ import User from "../models/userModel.js";
 import Message from "../models/messageModel.js";
 import Conversation from "../models/coversationModal.js";
 import handleVideoCallEvents from "../utils/video-call-events.js";
-import { decrypt } from "../utils/encryption.js"; // ADD THIS
 
-const findOrCreateConversation = async (senderId, receiverId) => {
-  let conversation = await Conversation.findOne({
-    participants: { $all: [senderId, receiverId] },
-  });
-  if (!conversation) {
-    conversation = await Conversation.create({
-      participants: [senderId, receiverId],
-      unreadCounts: { [senderId]: 0, [receiverId]: 0 },
-    });
-  }
-  return conversation;
-};
-
-const messageRateLimits = new Map();
-const WINDOW_MS = 60 * 1000;
-const MAX_MSG = 10;
-
-function socketHandler(server) {
+const socketHandler = (server) => {
   const io = new Server(server, {
     cors: {
-      origin: ["http://localhost:5173", "https://mygram247.netlify.app","http://localhost:8081"],
+      origin: ["http://localhost:5173", "https://mygram247.netlify.app", "http://localhost:8081"],
       credentials: true,
     },
     transports: ["websocket", "polling"],
@@ -45,87 +27,7 @@ function socketHandler(server) {
       socket.broadcast.emit("user-online", { userId });
     });
 
-    socket.on("sendMessage", async ({ senderId, receiverId, message, fileType, fileUrl, isForwarded }) => {
-      try {
-        // --- Rate limit (your code) ---
-        const now = Date.now();
-        if (!messageRateLimits.has(senderId)) messageRateLimits.set(senderId, []);
-        let timestamps = messageRateLimits.get(senderId).filter(t => now - t < WINDOW_MS);
-        if (timestamps.length >= MAX_MSG) {
-          socket.emit("rate-limit-error", { message: `Only ${MAX_MSG}/min allowed` });
-          return;
-        }
-        timestamps.push(now);
-        messageRateLimits.set(senderId, timestamps);
-
-        // 1. Save - model pre-save will ENCRYPT automatically
-        const newMessageDoc = await Message.create({
-          sender: senderId,
-          receiver: receiverId,
-          message, // plain in, encrypted stored
-          fileUrl,
-          fileType,
-          isForwarded,
-          isDelivered: global.onlineUsers.has(receiverId),
-          isSeen: false,
-        });
-
-        // 2. Create a DECRYPTED version for emitting - THIS IS THE FIX
-        // newMessageDoc.message is encrypted right now, so decrypt it for sockets
-        const plainMessageObj = newMessageDoc.toObject();
-        plainMessageObj.message = decrypt(plainMessageObj.message) || message; // fallback to original plain
-
-        const conversation = await findOrCreateConversation(senderId, receiverId);
-        const receiverSockets = global.onlineUsers.get(receiverId);
-        const senderUser = await User.findById(senderId).select("username profilePic");
-
-        let chatOpen = false;
-        if (receiverSockets) {
-          for (const sockId of receiverSockets) {
-            const sock = io.sockets.sockets.get(sockId);
-            if (sock?.chattingWith === senderId) { chatOpen = true; break; }
-          }
-        }
-
-        if (!chatOpen) {
-          const currentUnread = conversation.unreadCounts.get(receiverId) || 0;
-          conversation.unreadCounts.set(receiverId, currentUnread + 1);
-        }
-        conversation.lastMessage = newMessageDoc._id;
-        await conversation.save();
-
-        // 3. Emit PLAIN version
-        socket.emit("receiveMessage", plainMessageObj);
-        socket.to(senderId).emit("receiveMessage", plainMessageObj);
-
-        io.to(receiverId).emit("receiveMessage", {
-          ...plainMessageObj,
-          unreadCount: conversation.unreadCounts.get(receiverId) || 0,
-        });
-
-        io.to(receiverId).emit("unreadCountUpdated", {
-          senderId,
-          unreadCount: conversation.unreadCounts.get(receiverId) || 0,
-        });
-
-        // Notification - send plain preview
-        if (receiverSockets) {
-          for (const sockId of receiverSockets) {
-            const sock = io.sockets.sockets.get(sockId);
-            if (!sock || sock.chattingWith === senderId) continue;
-            io.to(sockId).emit("newNotification", {
-              senderId,
-              senderName: senderUser.username,
-              senderProfilePic: senderUser.profilePic,
-              text: plainMessageObj.message || "New file",
-              messageId: newMessageDoc._id,
-            });
-          }
-        }
-      } catch (err) {
-        console.error("Send message error:", err);
-      }
-    });
+    // ❌ sendMessage removed - now handled by REST controller
 
     socket.on("markSeen", async ({ userId, otherUserId }) => {
       await Message.updateMany({ sender: otherUserId, receiver: userId, isSeen: false }, { isSeen: true, seenAt: new Date() });
@@ -155,7 +57,6 @@ function socketHandler(server) {
         message.reactions.push({ user: userId, emoji });
       }
       await message.save();
-      // reactions don't need encryption
       io.to(message.sender.toString()).emit("message-reaction", { messageId, reactions: message.reactions });
       io.to(message.receiver.toString()).emit("message-reaction", { messageId, reactions: message.reactions });
     });
@@ -175,7 +76,8 @@ function socketHandler(server) {
       }
     });
   });
+
   return io;
-}
+};
 
 export default socketHandler;

@@ -9,6 +9,9 @@ const MessageSchema = new mongoose.Schema({
     message: { type: String, default: "" },
     fileUrl: { type: String, default: null },
     fileType: { type: String, default: null },
+    originalFileName: { type: String, default: null }, // ✅ ADD THIS
+    filePublicId: { type: String, default: null }, // ✅ ADD THIS for better download
+    fileSize: { type: Number, default: null }, // ✅ optional but useful
     isForwarded: { type: Boolean, default: false },
     isDelivered: { type: Boolean, default: false },
     deliveredAt: { type: Date, default: null },
@@ -18,7 +21,6 @@ const MessageSchema = new mongoose.Schema({
     isDeleted: { type: Boolean, default: false },
     deletedFor: [{ type: mongoose.Schema.Types.ObjectId, ref: "users" }],
 
-    // ✅ NEW for call logs
     messageType: { type: String, enum: ["text", "call_log"], default: "text" },
     callInfo: {
       type: { type: String, enum: ["missed", "rejected", "ended", "incoming"] },
