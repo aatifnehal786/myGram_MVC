@@ -9,7 +9,8 @@ import {
   forwardMessage, 
   deleteForMe,
   deleteForEveryone,
-  deleteMultipleForMe
+  deleteMultipleForMe,
+  sendMessageController
  
 } from '../controllers/chatController.js';
 import {blockGuest} from '../controllers/blockGuest.js';
@@ -20,6 +21,9 @@ const router = express.Router();
 
 router.post("/upload", auth,blockGuest, uploadChatFile);
 router.delete("/delete-chat", auth, blockGuest, deleteChatMessages);
+// routes/messageRoutes.js
+
+router.post("/send", auth, blockGuest, sendMessageController);
 
 router.get("/chat/:userId",blockGuest, auth, getChat);
 router.get("/search-users", auth, (req, res) => searchUsers(req, res, global.onlineUsers));
