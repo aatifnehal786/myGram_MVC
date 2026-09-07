@@ -15,21 +15,27 @@ const socketHandler = (server) => {
   });
 
   global.onlineUsers = new Map();
+  
+  // FIX 1: On server restart, make everyone offline
+  User.updateMany({}, { isOnline: false }).then(() => console.log("Reset online status"));
 
   io.on("connection", (socket) => {
     socket.on("join", async (userId) => {
-      socket.userId = userId;
-      socket.join(userId);
-      if (!global.onlineUsers.has(userId)) global.onlineUsers.set(userId, new Set());
-      global.onlineUsers.get(userId).add(socket.id);
-      await User.findByIdAndUpdate(userId, { isOnline: true });
+      const uid = userId.toString(); // FIX 2: always string
+      socket.userId = uid;
+      socket.join(uid);
+      
+      if (!global.onlineUsers.has(uid)) global.onlineUsers.set(uid, new Set());
+      global.onlineUsers.get(uid).add(socket.id);
+      
+      await User.findByIdAndUpdate(uid, { isOnline: true, lastSeen: null });
+      
       io.emit("online-users", Array.from(global.onlineUsers.keys()));
-      socket.broadcast.emit("user-online", { userId });
+      socket.broadcast.emit("user-online", { userId: uid });
     });
 
-    // ❌ sendMessage removed - now handled by REST controller
-
-    socket.on("markSeen", async ({ userId, otherUserId }) => {
+    
+     socket.on("markSeen", async ({ userId, otherUserId }) => {
       await Message.updateMany({ sender: otherUserId, receiver: userId, isSeen: false }, { isSeen: true, seenAt: new Date() });
       const conversation = await Conversation.findOne({ participants: { $all: [userId, otherUserId] } });
       if (conversation) {
@@ -40,9 +46,9 @@ const socketHandler = (server) => {
       io.to(otherUserId).emit("messagesSeen", { userId });
     });
 
-    socket.on("typing", ({ senderId, receiverId }) => io.to(receiverId).emit("typing", senderId));
-    socket.on("stopTyping", ({ senderId, receiverId }) => io.to(receiverId).emit("stopTyping", senderId));
-    socket.on("chatOpen", ({ chattingWith }) => { socket.chattingWith = chattingWith; });
+    socket.on("typing", ({ senderId, receiverId }) => io.to(receiverId.toString()).emit("typing", senderId.toString()));
+    socket.on("stopTyping", ({ senderId, receiverId }) => io.to(receiverId.toString()).emit("stopTyping", senderId.toString()));
+    socket.on("chatOpen", ({ chattingWith }) => { socket.chattingWith = chattingWith?.toString(); });
     socket.on("chatClose", () => { socket.chattingWith = null; });
 
     handleVideoCallEvents(socket, io, global.onlineUsers);
@@ -64,15 +70,18 @@ const socketHandler = (server) => {
     socket.on("disconnect", async () => {
       const userId = socket.userId;
       if (!userId) return;
+      
       const set = global.onlineUsers.get(userId);
       if (!set) return;
+      
       set.delete(socket.id);
       socket.leave(userId);
+      
       if (set.size === 0) {
         global.onlineUsers.delete(userId);
         await User.findByIdAndUpdate(userId, { isOnline: false, lastSeen: new Date() });
-        socket.broadcast.emit("user-offline", { userId, lastSeen: new Date() });
-        io.emit("online-users", Array.from(global.onlineUsers.keys()));
+        io.emit("user-offline", { userId, lastSeen: new Date() });
+        io.emit("online-users", Array.from(global.onlineUsers.keys())); // FIX 3: emit to ALL
       }
     });
   });
@@ -81,3 +90,9 @@ const socketHandler = (server) => {
 };
 
 export default socketHandler;
+
+
+
+
+     
+
