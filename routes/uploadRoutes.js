@@ -13,7 +13,7 @@ router.post("/profile", auth, blockGuest, uploadProfilePic.single("profilePic"),
 // ✅ Create Post - FIXED name: "media"
 router.post("/create", auth, blockGuest, upload.fields([
   { name: "media", maxCount: 1 }, // was "image" - BUG
-  { name: "backgroundMusic", maxCount: 1 }
+  { name: "backgroundMusic", maxCount: 1 } // optional background music for the post
 ]), createPost);
 
 export default router;
